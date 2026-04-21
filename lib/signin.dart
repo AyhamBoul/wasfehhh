@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'auth_service.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -11,15 +12,7 @@ class _SignInPageState extends State<SignInPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController nationalIdController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-
-  String _extractFirstNameFromCredentials(String role) {
-    final String id = nationalIdController.text.trim();
-    if (id.isNotEmpty) {
-      return 'User';
-    }
-
-    return role;
-  }
+  bool _isLoading = false;
 
   String _routeForRole(String role) {
     switch (role) {
@@ -33,33 +26,33 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
-  String _resolveRoleFromNationalId() {
-    final String normalizedId = nationalIdController.text.trim().toLowerCase();
-    if (normalizedId.contains('doc')) {
-      return 'Doctor';
-    }
-    if (normalizedId.contains('pha') || normalizedId.contains('phar')) {
-      return 'Pharmacist';
-    }
-    return 'Patient';
-  }
-
   Future<void> _signIn() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final String role = _resolveRoleFromNationalId();
-    final String firstName = _extractFirstNameFromCredentials(role);
+    setState(() => _isLoading = true);
 
-    if (!mounted) {
+    final user = await AuthService().login(
+      nationalId: nationalIdController.text.trim(),
+      password: passwordController.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Incorrect National ID or password.'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
     Navigator.pushReplacementNamed(
       context,
-      _routeForRole(role),
-      arguments: {'firstName': firstName},
+      _routeForRole(user.role),
+      arguments: {'firstName': user.firstName},
     );
   }
 
@@ -147,14 +140,24 @@ class _SignInPageState extends State<SignInPage> {
                 ),
               ),
               SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _signIn,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _signIn,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Sign In'),
                 ),
-                child: Text("Sign In"),
               ),
               SizedBox(height: 20),
               Center(

@@ -12,7 +12,6 @@ class PharmacistPortalPage extends StatelessWidget {
     const String authFirstName = 'User';
     final String routedFirstName = (args?['firstName'] as String? ?? '').trim();
     final String firstName = routedFirstName.isNotEmpty ? routedFirstName : authFirstName;
-    final Map<String, String> userArgs = {'firstName': firstName};
 
     return Scaffold(
       appBar: AppBar(
@@ -105,14 +104,23 @@ class PharmacistPortalPage extends StatelessWidget {
                   icon: Icons.chat,
                   label: "Doctor Chat",
                   onTap: () {
-                    Navigator.pushNamed(context, '/doctor-dashboard', arguments: userArgs);
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => DoctorPharmacistChat(
+                        firstName: firstName,
+                        userRole: 'pharmacist',
+                      ),
+                    );
                   },
                 ),
                 _PortalOption(
                   icon: Icons.refresh,
                   label: "Recent Activity",
                   onTap: () {
-                    Navigator.pushNamed(context, '/patient-dashboard', arguments: userArgs);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Recent activity coming soon.')),
+                    );
                   },
                 ),
               ],

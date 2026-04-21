@@ -9,10 +9,13 @@ import 'MedicationSchedulePage .dart';
 import 'map.dart';
 import 'notification_service.dart';
 import 'prescription_scanner_page.dart';
+import 'auth_service.dart';
+import 'patient_records_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService().init();
+  await AuthService().seedDemoAccounts();
   runApp(const MyApp());
 }
 
@@ -38,6 +41,7 @@ class MyApp extends StatelessWidget {
         '/medication-schedule': (context) => const MedicationSchedulePage(),
         '/pharmacy': (context) => const PharmacyPage(),
         '/prescription-scanner': (context) => const PrescriptionScannerPage(),
+        '/patient-records': (context) => const PatientRecordsPage(),
       },
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'auth_service.dart';
 
 class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
@@ -42,18 +43,31 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     return pieces.isEmpty || pieces.first.isEmpty ? 'User' : pieces.first;
   }
 
+  bool _isLoading = false;
+
   Future<void> _createAccount() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _isLoading = true);
+
+    final error = await AuthService().register(
+      nationalId: nationalIdController.text.trim(),
+      password: passwordController.text,
+      fullName: fullNameController.text.trim(),
+      email: emailController.text.trim(),
+      role: selectedRole,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
       return;
     }
 
-    final String fullName = fullNameController.text.trim();
-    final String firstName = _extractFirstName(fullName);
-
-    if (!mounted) {
-      return;
-    }
-
+    final String firstName = _extractFirstName(fullNameController.text.trim());
     Navigator.pushReplacementNamed(
       context,
       _routeForRole(selectedRole),
@@ -203,14 +217,25 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                 ],
               ),
               SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _createAccount,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF2980B9), // Blue button color
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
-                  textStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _createAccount,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF2980B9),
+                    padding: EdgeInsets.symmetric(vertical: 15),
+                    textStyle: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text("Create Account",
+                          style: TextStyle(color: Colors.white)),
                 ),
-                child: Text("Create Account"),
               ),
               SizedBox(height: 20),
               Row(

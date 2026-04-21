@@ -56,7 +56,7 @@ class _PharmacyPageState extends State<PharmacyPage> {
           ),
         ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,11 +104,36 @@ class _PharmacyPageState extends State<PharmacyPage> {
             ),
             const SizedBox(height: 10),
             const Text(
-              "Here are 3 highly rated pharmacies within 5km of your location:\n"
-              "1. **CBHS Pharmacy** - 1380 Howard St, San Francisco, CA 94103, USA (Rating: 5, Distance: 1.4 km)\n"
-              "2. **Gates Opioids Pharmacy** - 2101 Sutter St, San Francisco, CA 94115, USA (Rating: 4.5, Distance: 3.3 km)\n"
-              "3. **CVS Pharmacy** - 701 Van Ness Ave, San Francisco, CA 94102, USA (Rating: 4.2, Distance: 2.0 km)",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              'Here are 3 highly rated pharmacies within 5km of your location:',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const SizedBox(height: 6),
+            ...[
+              ('CBHS Pharmacy',
+                  '1380 Howard St, San Francisco, CA 94103 — Rating: 5 ⭐ · 1.4 km'),
+              ('Gates Opioids Pharmacy',
+                  '2101 Sutter St, San Francisco, CA 94115 — Rating: 4.5 ⭐ · 3.3 km'),
+              ('CVS Pharmacy',
+                  '701 Van Ness Ave, San Francisco, CA 94102 — Rating: 4.2 ⭐ · 2.0 km'),
+            ].map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                      text: '${entry.$1}  ',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87),
+                    ),
+                    TextSpan(
+                      text: entry.$2,
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.grey),
+                    ),
+                  ]),
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             // Nearby Pharmacies

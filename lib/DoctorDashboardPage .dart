@@ -70,14 +70,23 @@ class DoctorDashboardPage extends StatelessWidget {
                   icon: Icons.history,
                   label: "Patient History",
                   onTap: () {
-                    Navigator.pushNamed(context, '/patient-dashboard', arguments: userArgs);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Patient history coming soon.')),
+                    );
                   },
                 ),
                 _DashboardOption(
                   icon: Icons.chat_bubble,
                   label: "Pharmacists",
                   onTap: () {
-                    Navigator.pushNamed(context, '/pharmacist-portal', arguments: userArgs);
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => DoctorPharmacistChat(
+                        firstName: firstName,
+                        userRole: 'doctor',
+                      ),
+                    );
                   },
                 ),
               ],

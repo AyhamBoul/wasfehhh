@@ -58,7 +58,8 @@ class PatientDashboardPage extends StatelessWidget {
                   icon: Icons.article,
                   label: "My Records",
                   onTap: () {
-                    // Navigate to medical records
+                    Navigator.pushNamed(context, '/patient-records',
+                        arguments: userArgs);
                   },
                 ),
                 _PatientOption(
@@ -83,7 +84,9 @@ class PatientDashboardPage extends StatelessWidget {
                   icon: Icons.connect_without_contact,
                   label: "Doctor Connect",
                   onTap: () {
-                    Navigator.pushNamed(context, '/doctor-dashboard', arguments: userArgs);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Doctor Connect coming soon.')),
+                    );
                   },
                 ),
               ],

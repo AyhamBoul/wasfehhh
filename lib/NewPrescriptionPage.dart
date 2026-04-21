@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'doctor_pharmacist_chat.dart';
 
 class _MedEntry {
   final TextEditingController name = TextEditingController();
@@ -272,7 +273,14 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
             case 0:
               Navigator.pushReplacementNamed(context, '/doctor-dashboard');
             case 2:
-              Navigator.pushReplacementNamed(context, '/doctor-dashboard');
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => const DoctorPharmacistChat(
+                  firstName: 'Doctor',
+                  userRole: 'doctor',
+                ),
+              );
             case 3:
               Navigator.pushReplacementNamed(context, '/signin');
           }
