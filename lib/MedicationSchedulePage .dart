@@ -7,7 +7,7 @@ class _MedicationEntry {
   final String dosage;
   final int hour;
   final int minute;
-  bool isTaken;
+  bool isTaken = false;
 
   _MedicationEntry({
     required this.time,
@@ -15,7 +15,6 @@ class _MedicationEntry {
     required this.dosage,
     required this.hour,
     required this.minute,
-    this.isTaken = false,
   });
 }
 
