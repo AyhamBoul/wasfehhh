@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_theme.dart';
 import 'createaccount.dart';
 import 'signin.dart';
 import 'PatientDashboardPage.dart';
@@ -11,6 +12,7 @@ import 'notification_service.dart';
 import 'prescription_scanner_page.dart';
 import 'auth_service.dart';
 import 'patient_records_page.dart';
+import 'guest_home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,10 +28,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Wasfeh',
-      theme: ThemeData(
-        primarySwatch: Colors.blue, // اللون الرئيسي للتطبيق
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
+      theme: buildTheme(),
       home: const CreateAccountPage(),
       routes: {
         '/create-account': (context) => const CreateAccountPage(),
@@ -42,6 +41,7 @@ class MyApp extends StatelessWidget {
         '/pharmacy': (context) => const PharmacyPage(),
         '/prescription-scanner': (context) => const PrescriptionScannerPage(),
         '/patient-records': (context) => const PatientRecordsPage(),
+        '/guest-home': (context) => const GuestHomePage(),
       },
     );
   }

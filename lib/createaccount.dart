@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_theme.dart';
 import 'auth_service.dart';
 
 class CreateAccountPage extends StatefulWidget {
@@ -11,11 +12,12 @@ class CreateAccountPage extends StatefulWidget {
 class _CreateAccountPageState extends State<CreateAccountPage> {
   String selectedRole = 'Patient';
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
   final TextEditingController fullNameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController nationalIdController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  bool _isLoading = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -32,24 +34,19 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
         return '/doctor-dashboard';
       case 'Pharmacist':
         return '/pharmacist-portal';
-      case 'Patient':
       default:
         return '/patient-dashboard';
     }
   }
 
   String _extractFirstName(String fullName) {
-    final List<String> pieces = fullName.trim().split(RegExp(r'\s+'));
-    return pieces.isEmpty || pieces.first.isEmpty ? 'User' : pieces.first;
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    return parts.isEmpty || parts.first.isEmpty ? 'User' : parts.first;
   }
-
-  bool _isLoading = false;
 
   Future<void> _createAccount() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
     setState(() => _isLoading = true);
-
     final error = await AuthService().register(
       nationalId: nationalIdController.text.trim(),
       password: passwordController.text,
@@ -57,198 +54,257 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       email: emailController.text.trim(),
       role: selectedRole,
     );
-
     if (!mounted) return;
     setState(() => _isLoading = false);
-
     if (error != null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
+          .showSnackBar(SnackBar(content: Text(error), backgroundColor: kDanger));
       return;
     }
-
-    final String firstName = _extractFirstName(fullNameController.text.trim());
     Navigator.pushReplacementNamed(
       context,
       _routeForRole(selectedRole),
-      arguments: {'firstName': firstName},
+      arguments: {'firstName': _extractFirstName(fullNameController.text.trim())},
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Create Account"),
-        backgroundColor: Color(0xFFFFFFFF), // White color for the app bar
-        foregroundColor: Color(0xFF000000), // Black color for the text
-        elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Form(
-          key: _formKey,
+      backgroundColor: kBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Join Wasfeh health ecosystem",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 30),
-              TextFormField(
-                controller: fullNameController,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Full Name is required';
-                  }
-                  return null;
-                },
-                decoration: InputDecoration(
-                  labelText: "Full Name",
-                  labelStyle: TextStyle(color: Color(0xFF2C3E50)), // Dark text color for labels
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFFBDC3C7)), // Border color
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF2980B9)), // Focused border color (blue)
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              TextFormField(
-                controller: emailController,
-                validator: (value) {
-                  final String email = value?.trim() ?? '';
-                  if (email.isEmpty) {
-                    return 'Email Address is required';
-                  }
-                  if (!email.contains('@')) {
-                    return "Email must contain '@'";
-                  }
-                  return null;
-                },
-                decoration: InputDecoration(
-                  labelText: "Email Address",
-                  labelStyle: TextStyle(color: Color(0xFF2C3E50)),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFFBDC3C7)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF2980B9)),
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              TextFormField(
-                controller: nationalIdController,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'National ID is required';
-                  }
-                  return null;
-                },
-                decoration: InputDecoration(
-                  labelText: "National ID",
-                  labelStyle: TextStyle(color: Color(0xFF2C3E50)),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFFBDC3C7)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF2980B9)),
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              TextFormField(
-                controller: passwordController,
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Password is required';
-                  }
-                  return null;
-                },
-                decoration: InputDecoration(
-                  labelText: "Password",
-                  labelStyle: TextStyle(color: Color(0xFF2C3E50)),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFFBDC3C7)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF2980B9)),
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              Text("Select Your Role"),
-              SizedBox(height: 10),
-              Row(
-                children: [
-                  RoleButton(
-                    label: 'Patient',
-                    isSelected: selectedRole == 'Patient',
-                    onPressed: () {
-                      setState(() {
-                        selectedRole = 'Patient';
-                      });
-                    },
-                  ),
-                  SizedBox(width: 10),
-                  RoleButton(
-                    label: 'Doctor',
-                    isSelected: selectedRole == 'Doctor',
-                    onPressed: () {
-                      setState(() {
-                        selectedRole = 'Doctor';
-                      });
-                    },
-                  ),
-                  SizedBox(width: 10),
-                  RoleButton(
-                    label: 'Pharmacist',
-                    isSelected: selectedRole == 'Pharmacist',
-                    onPressed: () {
-                      setState(() {
-                        selectedRole = 'Pharmacist';
-                      });
-                    },
-                  ),
-                ],
-              ),
-              SizedBox(height: 30),
-              SizedBox(
+              // ── Gradient header ──
+              Container(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _createAccount,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF2980B9),
-                    padding: EdgeInsets.symmetric(vertical: 15),
-                    textStyle: TextStyle(fontWeight: FontWeight.bold),
+                padding: const EdgeInsets.fromLTRB(28, 40, 28, 32),
+                decoration: const BoxDecoration(
+                  gradient: kGradient,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(32),
+                    bottomRight: Radius.circular(32),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text("Create Account",
-                          style: TextStyle(color: Colors.white)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.health_and_safety_rounded,
+                          color: Colors.white, size: 30),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Create account',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Join the Wasfeh health ecosystem',
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 14),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text("Already have an account? "),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/signin');
-                    },
-                    child: Text("Sign In", style: TextStyle(color: Color(0xFF2980B9))),
+
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+
+                      // Role selector
+                      const Text('I am a',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: kTextPrimary)),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: ['Patient', 'Doctor', 'Pharmacist'].map((r) {
+                          final selected = selectedRole == r;
+                          return Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => selectedRole = r),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: selected ? kPrimary : kCardBg,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: selected ? kPrimary : kBorder,
+                                    width: selected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      r == 'Patient'
+                                          ? Icons.person_outline
+                                          : r == 'Doctor'
+                                              ? Icons.medical_services_outlined
+                                              : Icons.local_pharmacy_outlined,
+                                      color: selected ? Colors.white : kTextSecondary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(r,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: selected ? Colors.white : kTextSecondary,
+                                        )),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+
+                      _fieldLabel('Full Name'),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: fullNameController,
+                        textCapitalization: TextCapitalization.words,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Full name is required'
+                            : null,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Ahmad Nasser',
+                          prefixIcon: Icon(Icons.person_outline,
+                              color: kTextSecondary, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      _fieldLabel('Email Address'),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          final e = v?.trim() ?? '';
+                          if (e.isEmpty) return 'Email is required';
+                          if (!e.contains('@')) return "Enter a valid email";
+                          return null;
+                        },
+                        decoration: const InputDecoration(
+                          hintText: 'you@example.com',
+                          prefixIcon: Icon(Icons.email_outlined,
+                              color: kTextSecondary, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      _fieldLabel('National ID'),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: nationalIdController,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'National ID is required'
+                            : null,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. PAT-001',
+                          prefixIcon: Icon(Icons.badge_outlined,
+                              color: kTextSecondary, size: 20),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      _fieldLabel('Password'),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: passwordController,
+                        obscureText: _obscure,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Password is required'
+                            : null,
+                        decoration: InputDecoration(
+                          hintText: '••••••••',
+                          prefixIcon: const Icon(Icons.lock_outline,
+                              color: kTextSecondary, size: 20),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscure
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: kTextSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _obscure = !_obscure),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _createAccount,
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Text('Create Account'),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('Already have an account?',
+                              style: TextStyle(
+                                  color: kTextSecondary, fontSize: 14)),
+                          TextButton(
+                            onPressed: () => Navigator.pushReplacementNamed(
+                                context, '/signin'),
+                            style: TextButton.styleFrom(
+                                foregroundColor: kPrimary,
+                                padding: const EdgeInsets.only(left: 4)),
+                            child: const Text('Sign In',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14)),
+                          ),
+                        ],
+                      ),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => Navigator.pushReplacementNamed(
+                              context, '/guest-home'),
+                          style: TextButton.styleFrom(
+                              foregroundColor: kTextSecondary),
+                          child: const Text('Continue as Guest',
+                              style: TextStyle(fontSize: 13)),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -258,36 +314,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   }
 }
 
-class RoleButton extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onPressed;
-
-  const RoleButton({super.key, 
-    required this.label,
-    required this.isSelected,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-        decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF2980B9) : Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Color(0xFF2980B9)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Color(0xFF2980B9),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+Widget _fieldLabel(String text) => Text(
+      text,
+      style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: kTextPrimary,
+          letterSpacing: 0.2),
     );
-  }
-}  

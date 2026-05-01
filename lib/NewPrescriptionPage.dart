@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'app_theme.dart';
 import 'doctor_pharmacist_chat.dart';
 
 class _MedEntry {
@@ -41,9 +42,7 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
     super.dispose();
   }
 
-  void _addMedication() {
-    setState(() => _medications.add(_MedEntry()));
-  }
+  void _addMedication() => setState(() => _medications.add(_MedEntry()));
 
   void _removeMedication(int index) {
     if (_medications.length == 1) return;
@@ -73,82 +72,110 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
         .join(';');
     final notes = _notesController.text.trim();
     final now = DateTime.now();
-    final timestamp =
+    final ts =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    return 'QM|$patientId|$medsEncoded|$notes|$timestamp';
+    return 'QM|$patientId|$medsEncoded|$notes|$ts';
   }
 
   void _issuePrescription() {
     final error = _validate();
     if (error != null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
+          .showSnackBar(SnackBar(content: Text(error), backgroundColor: kDanger));
       return;
     }
-
-    final qrData = _buildQrData();
-    _showQrDialog(qrData);
+    _showQrDialog(_buildQrData());
   }
 
   void _showQrDialog(String qrData) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Prescription Issued'),
-          ],
-        ),
-        content: SingleChildScrollView(
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Share this QR code with the patient or pharmacist.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 220,
-                backgroundColor: Colors.white,
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: kSuccess.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle_outline,
+                    color: kSuccess, size: 28),
               ),
               const SizedBox(height: 12),
-              Text(
-                'Patient: ${_patientIdController.text.trim()}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+              const Text('Prescription Issued',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
               const SizedBox(height: 4),
-              Text(
-                '${_medications.length} medication(s) prescribed',
-                style: const TextStyle(color: Colors.grey),
+              const Text('Share this QR with the patient or pharmacist.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: kTextSecondary)),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: kBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 200,
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Patient: ${_patientIdController.text.trim()}  ·  ${_medications.length} medication(s)',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: kPrimary,
+                      fontWeight: FontWeight.w500),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _clearForm();
+                      },
+                      child: const Text('New'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.pushReplacementNamed(
+                            context, '/doctor-dashboard');
+                      },
+                      child: const Text('Done'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _clearForm();
-            },
-            child: const Text('New Prescription'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pushReplacementNamed(context, '/doctor-dashboard');
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child:
-                const Text('Done', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -160,20 +187,21 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
       for (final m in _medications) {
         m.dispose();
       }
-      _medications
-        ..clear()
-        ..add(_MedEntry());
+      _medications..clear()..add(_MedEntry());
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('New Prescription'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          onPressed: () =>
+              Navigator.pushReplacementNamed(context, '/doctor-dashboard'),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -181,21 +209,16 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Issue a secure digital prescription',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-              const SizedBox(height: 20),
-
               // Patient ID
+              _SectionLabel(label: 'Patient National ID'),
+              const SizedBox(height: 6),
               TextField(
                 controller: _patientIdController,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.text,
                 decoration: const InputDecoration(
-                  labelText: 'Patient National ID',
-                  hintText: 'e.g. 1092837456',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+                  hintText: 'e.g. PAT-001',
+                  prefixIcon: Icon(Icons.badge_outlined,
+                      color: kTextSecondary, size: 20),
                 ),
               ),
               const SizedBox(height: 24),
@@ -204,62 +227,59 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Medications',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton.icon(
-                    onPressed: _addMedication,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Med'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                  const _SectionLabel(label: 'Medications'),
+                  GestureDetector(
+                    onTap: _addMedication,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: kPrimaryLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.add, color: kPrimary, size: 16),
+                          SizedBox(width: 4),
+                          Text('Add Med',
+                              style: TextStyle(
+                                  color: kPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+
+              ..._medications.asMap().entries.map((e) => _MedicationEntryCard(
+                    index: e.key,
+                    entry: e.value,
+                    canRemove: _medications.length > 1,
+                    onRemove: () => _removeMedication(e.key),
+                    onChanged: () => setState(() {}),
+                  )),
+
               const SizedBox(height: 8),
-
-              // Medication entries
-              ..._medications.asMap().entries.map((entry) {
-                final i = entry.key;
-                final med = entry.value;
-                return _MedicationEntryCard(
-                  index: i,
-                  entry: med,
-                  canRemove: _medications.length > 1,
-                  onRemove: () => _removeMedication(i),
-                  onChanged: () => setState(() {}),
-                );
-              }),
-
-              const SizedBox(height: 16),
-
-              // Additional notes
+              _SectionLabel(label: 'Additional Notes'),
+              const SizedBox(height: 6),
               TextField(
                 controller: _notesController,
                 maxLines: 3,
                 decoration: const InputDecoration(
-                  labelText: 'Additional Notes (optional)',
                   hintText: 'Special instructions or precautions...',
-                  border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Issue button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _issuePrescription,
-                  icon: const Icon(Icons.qr_code),
+                  icon: const Icon(Icons.qr_code, size: 18),
                   label: const Text('Issue Prescription'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
                 ),
               ),
             ],
@@ -268,34 +288,58 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,
-        onTap: (index) {
-          switch (index) {
+        onTap: (i) {
+          switch (i) {
             case 0:
               Navigator.pushReplacementNamed(context, '/doctor-dashboard');
             case 2:
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
+                backgroundColor: Colors.transparent,
                 builder: (_) => const DoctorPharmacistChat(
-                  firstName: 'Doctor',
-                  userRole: 'doctor',
-                ),
+                    firstName: 'Doctor', userRole: 'doctor'),
               );
             case 3:
               Navigator.pushReplacementNamed(context, '/signin');
           }
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Create'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.message), label: 'Messages'),
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.account_circle), label: 'Profile'),
+              icon: Icon(Icons.add_circle_outline),
+              activeIcon: Icon(Icons.add_circle),
+              label: 'Create'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              activeIcon: Icon(Icons.chat_bubble),
+              label: 'Messages'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_circle_outlined),
+              activeIcon: Icon(Icons.account_circle),
+              label: 'Profile'),
         ],
       ),
     );
   }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) => Text(
+        label,
+        style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: kTextPrimary,
+            letterSpacing: 0.2),
+      );
 }
 
 class _MedicationEntryCard extends StatelessWidget {
@@ -315,70 +359,95 @@ class _MedicationEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Medication ${index + 1}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (canRemove)
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle, color: Colors.red),
-                    onPressed: onRemove,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Center(
+                      child: Text('${index + 1}',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: kPrimary)),
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: entry.name,
-              onChanged: (_) => onChanged(),
-              decoration: const InputDecoration(
-                labelText: 'Medication Name',
-                border: OutlineInputBorder(),
-                isDense: true,
+                  const SizedBox(width: 8),
+                  const Text('Medication',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: kTextPrimary)),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: entry.dosage,
-                    onChanged: (_) => onChanged(),
-                    decoration: const InputDecoration(
-                      labelText: 'Dosage (e.g. 500mg)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
+              if (canRemove)
+                GestureDetector(
+                  onTap: onRemove,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: kDanger.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
                     ),
+                    child: const Icon(Icons.close,
+                        color: kDanger, size: 14),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: entry.frequency,
-                    onChanged: (_) => onChanged(),
-                    decoration: const InputDecoration(
-                      labelText: 'Frequency',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: entry.name,
+            onChanged: (_) => onChanged(),
+            decoration: const InputDecoration(
+              hintText: 'Medication name',
+              prefixIcon: Icon(Icons.medication_outlined,
+                  color: kTextSecondary, size: 18),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: entry.dosage,
+                  onChanged: (_) => onChanged(),
+                  decoration: const InputDecoration(
+                    hintText: 'Dosage (e.g. 500mg)',
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: entry.frequency,
+                  onChanged: (_) => onChanged(),
+                  decoration: const InputDecoration(
+                    hintText: 'Frequency',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

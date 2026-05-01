@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'app_theme.dart';
 
 class PharmacyPage extends StatefulWidget {
   const PharmacyPage({super.key});
@@ -10,30 +13,54 @@ class PharmacyPage extends StatefulWidget {
 }
 
 class _PharmacyPageState extends State<PharmacyPage> {
-  static const CameraPosition _initialCamera = CameraPosition(
-    target: LatLng(37.7749, -122.4194),
-    zoom: 13,
-  );
-
-  static final Set<Marker> _pharmacyMarkers = {
-    Marker(
-      markerId: MarkerId('cvs'),
-      position: LatLng(37.7804, -122.4212),
-      infoWindow: InfoWindow(title: 'CVS Pharmacy'),
-    ),
-    Marker(
-      markerId: MarkerId('walgreens'),
-      position: LatLng(37.7840, -122.4089),
-      infoWindow: InfoWindow(title: 'Walgreens Pharmacy'),
-    ),
-    Marker(
-      markerId: MarkerId('cbhs'),
-      position: LatLng(37.7736, -122.4244),
-      infoWindow: InfoWindow(title: 'CBHS Pharmacy'),
-    ),
-  };
-
   final TextEditingController _searchController = TextEditingController();
+  final MapController _mapController = MapController();
+  LatLng _center = const LatLng(31.9522, 35.9330);
+  bool _locating = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _locateUser();
+  }
+
+  Future<void> _locateUser() async {
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _locating = false);
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
+      if (mounted) {
+        setState(() {
+          _center = LatLng(pos.latitude, pos.longitude);
+          _locating = false;
+        });
+        _mapController.move(_center, 15);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  Future<void> _launchMaps(String query) async {
+    final q = query.isEmpty ? 'pharmacies near me' : query;
+    final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(q)}');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps.')));
+    }
+  }
 
   @override
   void dispose() {
@@ -43,192 +70,266 @@ class _PharmacyPageState extends State<PharmacyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final Map<dynamic, dynamic>? args =
+        ModalRoute.of(context)?.settings.arguments as Map<dynamic, dynamic>?;
+    final String firstName = args?['firstName'] as String? ?? 'User';
+    final Map<String, String> userArgs = {'firstName': firstName};
+
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
-        title: const Text("Pharmacy"),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        title: const Text('Pharmacy Map'),
         actions: [
           IconButton(
-            icon: Icon(Icons.notifications),
-            onPressed: () {},
-          ),
+              icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search bar for pharmacy
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: "Search for a pharmacy...",
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 260,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: GoogleMap(
-                  initialCameraPosition: _initialCamera,
-                  myLocationButtonEnabled: true,
-                  zoomControlsEnabled: true,
-                  markers: _pharmacyMarkers,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                _launchMapForQuery(_searchController.text.trim());
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text("Open in Google Maps"),
-            ),
-            const SizedBox(height: 20),
-            // AI Recommendations
-            const Text(
-              "AI Assistant Recommendations",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Here are 3 highly rated pharmacies within 5km of your location:',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 6),
-            ...[
-              ('CBHS Pharmacy',
-                  '1380 Howard St, San Francisco, CA 94103 — Rating: 5 ⭐ · 1.4 km'),
-              ('Gates Opioids Pharmacy',
-                  '2101 Sutter St, San Francisco, CA 94115 — Rating: 4.5 ⭐ · 3.3 km'),
-              ('CVS Pharmacy',
-                  '701 Van Ness Ave, San Francisco, CA 94102 — Rating: 4.2 ⭐ · 2.0 km'),
-            ].map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text.rich(
-                  TextSpan(children: [
-                    TextSpan(
-                      text: '${entry.$1}  ',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87),
+            // ── Map ──
+            Stack(
+              children: [
+                SizedBox(
+                  height: 280,
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _center,
+                      initialZoom: 15,
                     ),
-                    TextSpan(
-                      text: entry.$2,
-                      style: const TextStyle(
-                          fontSize: 13, color: Colors.grey),
-                    ),
-                  ]),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.wasfehhh',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _center,
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: kPrimary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: kPrimary.withValues(alpha: 0.4),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(Icons.my_location,
+                                  color: Colors.white, size: 18),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+                if (_locating)
+                  const Positioned.fill(
+                    child: Center(
+                        child: CircularProgressIndicator(color: kPrimary)),
+                  ),
+                Positioned(
+                  bottom: 12,
+                  right: 12,
+                  child: FloatingActionButton.small(
+                    heroTag: 'locate_map',
+                    backgroundColor: kCardBg,
+                    foregroundColor: kPrimary,
+                    elevation: 3,
+                    onPressed: () => _mapController.move(_center, 15),
+                    child: const Icon(Icons.my_location, size: 18),
+                  ),
+                ),
+              ],
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Search bar
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search for a pharmacy...',
+                      prefixIcon: const Icon(Icons.search,
+                          color: kTextSecondary, size: 20),
+                      suffixIcon: GestureDetector(
+                        onTap: () =>
+                            _launchMaps(_searchController.text.trim()),
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: kPrimary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.arrow_forward,
+                              color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  const Text('Nearby Pharmacies',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary)),
+                  const SizedBox(height: 4),
+                  const Text(
+                      'Tap Navigate to open directions in Google Maps.',
+                      style:
+                          TextStyle(fontSize: 12, color: kTextSecondary)),
+                  const SizedBox(height: 14),
+
+                  _PharmacyCard(
+                    name: 'Nearest Pharmacy',
+                    query: 'pharmacy near me',
+                    icon: Icons.local_pharmacy,
+                    color: kPrimary,
+                    onTap: _launchMaps,
+                  ),
+                  const SizedBox(height: 10),
+                  _PharmacyCard(
+                    name: '24-Hour Pharmacy',
+                    query: '24 hour pharmacy near me',
+                    icon: Icons.nightlight_outlined,
+                    color: const Color(0xFF7C3AED),
+                    onTap: _launchMaps,
+                  ),
+                  const SizedBox(height: 10),
+                  _PharmacyCard(
+                    name: 'Hospital Pharmacy',
+                    query: 'hospital pharmacy near me',
+                    icon: Icons.local_hospital_outlined,
+                    color: kDanger,
+                    onTap: _launchMaps,
+                  ),
+                  const SizedBox(height: 16),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _launchMaps('pharmacies near me'),
+                      icon: const Icon(Icons.search, size: 18),
+                      label: const Text('Search All Nearby Pharmacies'),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 20),
-            // Nearby Pharmacies
-            const Text(
-              "Nearby Pharmacies",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            _NearbyPharmacy(
-              name: "CVS Pharmacy",
-              url: "https://maps.google.com/?cid=1379669075810392204",
-            ),
-            _NearbyPharmacy(
-              name: "Walgreens Pharmacy",
-              url: "https://maps.google.com/?cid=1379669075810392205",
             ),
           ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2, // Adjust this based on navigation state
-        onTap: (index) {
-          switch (index) {
+        currentIndex: 2,
+        onTap: (i) {
+          switch (i) {
             case 0:
-              Navigator.pushReplacementNamed(context, '/patient-dashboard');
-              break;
+              Navigator.pushReplacementNamed(context, '/patient-dashboard',
+                  arguments: userArgs);
             case 1:
-              Navigator.pushReplacementNamed(context, '/medication-schedule');
-              break;
-            case 2:
-              break;
+              Navigator.pushReplacementNamed(context, '/medication-schedule',
+                  arguments: userArgs);
             case 3:
               Navigator.pushReplacementNamed(context, '/signin');
-              break;
           }
         },
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: "Calendar"),
-          BottomNavigationBarItem(icon: Icon(Icons.local_pharmacy), label: "Pharmacy"),
-          BottomNavigationBarItem(icon: Icon(Icons.account_circle), label: "Profile"),
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today_outlined),
+              activeIcon: Icon(Icons.calendar_today),
+              label: 'Calendar'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.local_pharmacy_outlined),
+              activeIcon: Icon(Icons.local_pharmacy),
+              label: 'Pharmacy'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_circle_outlined),
+              activeIcon: Icon(Icons.account_circle),
+              label: 'Profile'),
         ],
       ),
     );
   }
-
-  Future<void> _launchMapForQuery(String query) async {
-    final String sanitized = query.isEmpty ? 'nearby pharmacies' : query;
-    final Uri mapsUri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(sanitized)}',
-    );
-
-    final bool launched = await launchUrl(
-      mapsUri,
-      mode: LaunchMode.externalApplication,
-    );
-
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Google Maps.')),
-      );
-    }
-  }
 }
 
-class _NearbyPharmacy extends StatelessWidget {
+class _PharmacyCard extends StatelessWidget {
   final String name;
-  final String url;
+  final String query;
+  final IconData icon;
+  final Color color;
+  final Future<void> Function(String) onTap;
 
-  const _NearbyPharmacy({
+  const _PharmacyCard({
     required this.name,
-    required this.url,
+    required this.query,
+    required this.icon,
+    required this.color,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.symmetric(vertical: 10),
-      child: ListTile(
-        title: Text(name),
-        trailing: ElevatedButton(
-          onPressed: () {
-            _launchURL(url);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          child: const Text("Navigate"),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(name,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary,
+                    fontSize: 14)),
+          ),
+          ElevatedButton(
+            onPressed: () => onTap(query),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              minimumSize: Size.zero,
+              textStyle:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Navigate'),
+          ),
+        ],
       ),
     );
-  }
-
-  Future<void> _launchURL(String url) async {
-    final Uri uri = Uri.parse(url);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

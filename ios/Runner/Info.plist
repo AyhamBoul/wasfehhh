@@ -45,8 +45,8 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>GMSApiKey</key>
-	<string>$(MAPS_API_KEY)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Quick Medi uses your location to show nearby pharmacies.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Quick Medi needs camera access to scan prescription QR codes.</string>
 	<key>NSUserNotificationsUsageDescription</key>

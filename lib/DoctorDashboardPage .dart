@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_theme.dart';
 import 'doctor_pharmacist_chat.dart';
 
 class DoctorDashboardPage extends StatelessWidget {
@@ -8,158 +9,282 @@ class DoctorDashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final Map<dynamic, dynamic>? args =
         ModalRoute.of(context)?.settings.arguments as Map<dynamic, dynamic>?;
-    const String authFirstName = 'User';
-    final String routedFirstName = (args?['firstName'] as String? ?? '').trim();
-    final String firstName = routedFirstName.isNotEmpty ? routedFirstName : authFirstName;
+    final String firstName =
+        (args?['firstName'] as String? ?? '').trim().isNotEmpty
+            ? args!['firstName'] as String
+            : 'Doctor';
     final Map<String, String> userArgs = {'firstName': firstName};
 
+    final hour = DateTime.now().hour;
+    final greeting =
+        hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Wasfeh"),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Hello, $firstName",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 5),
-            Text(
-              "How can we help your patients today?",
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            SizedBox(height: 20),
-            Card(
-              color: Colors.blue,
-              margin: EdgeInsets.symmetric(vertical: 10),
-              child: ListTile(
-                contentPadding: EdgeInsets.all(20),
-                leading: Icon(Icons.add, color: Colors.white),
-                title: Text(
-                  "New Prescription",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+      backgroundColor: kBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header ──
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF0F766E), Color(0xFF2DD4BF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(28),
+                    bottomRight: Radius.circular(28),
+                  ),
                 ),
-                subtitle: Text(
-                  "Issue a secure digital prescription with AI safety checks.",
-                  style: TextStyle(color: Colors.white),
-                ),
-                trailing: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/new-prescription', arguments: userArgs);
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white),
-                  child: Text("Create Now", style: TextStyle(color: Colors.blue)),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                _DashboardOption(
-                  icon: Icons.history,
-                  label: "Patient History",
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Patient history coming soon.')),
-                    );
-                  },
-                ),
-                _DashboardOption(
-                  icon: Icons.chat_bubble,
-                  label: "Pharmacists",
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) => DoctorPharmacistChat(
-                        firstName: firstName,
-                        userRole: 'doctor',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('$greeting, Dr.',
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontSize: 14)),
+                            Text(firstName,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5)),
+                          ],
+                        ),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.notifications_outlined,
+                              color: Colors.white, size: 22),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // New prescription CTA
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(
+                          context, '/new-prescription',
+                          arguments: userArgs),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.add_circle_outline,
+                                  color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('New Prescription',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14)),
+                                  Text('Issue a secure digital prescription',
+                                      style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios,
+                                color: Colors.white70, size: 14),
+                          ],
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            SizedBox(height: 20),
-            Text(
-              "Recent Issues",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            const Expanded(
-              child: Center(
-                child: Text('No recent issues yet.'),
               ),
-            ),
-          ],
+
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Quick Actions',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary)),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _DoctorCard(
+                          icon: Icons.history_outlined,
+                          label: 'Patient History',
+                          subtitle: 'Coming soon',
+                          color: const Color(0xFF6366F1),
+                          onTap: () =>
+                              ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Patient history coming soon.')),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _DoctorCard(
+                          icon: Icons.chat_bubble_outline,
+                          label: 'Pharmacist Chat',
+                          subtitle: 'Message now',
+                          color: const Color(0xFF0EA5E9),
+                          onTap: () => showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => DoctorPharmacistChat(
+                                firstName: firstName, userRole: 'doctor'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Recent Issues',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: kTextPrimary)),
+                        Text('0 total',
+                            style: TextStyle(
+                                fontSize: 13, color: kTextSecondary)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _EmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      message: 'No recent prescriptions issued yet.',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0, // Adjust this based on navigation state
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              break;
+        currentIndex: 0,
+        onTap: (i) {
+          switch (i) {
             case 1:
-              Navigator.pushReplacementNamed(context, '/new-prescription', arguments: userArgs);
-              break;
+              Navigator.pushReplacementNamed(context, '/new-prescription',
+                  arguments: userArgs);
             case 2:
-              // Open chat as bottom sheet instead of navigating
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
-                builder: (context) => DoctorPharmacistChat(
-                  firstName: firstName,
-                  userRole: 'doctor',
-                ),
+                backgroundColor: Colors.transparent,
+                builder: (_) => DoctorPharmacistChat(
+                    firstName: firstName, userRole: 'doctor'),
               );
-              break;
             case 3:
               Navigator.pushReplacementNamed(context, '/signin');
-              break;
           }
         },
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.add), label: "Create"),
-          BottomNavigationBarItem(icon: Icon(Icons.message), label: "Messages"),
-          BottomNavigationBarItem(icon: Icon(Icons.account_circle), label: "Profile"),
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.add_circle_outline),
+              activeIcon: Icon(Icons.add_circle),
+              label: 'Create'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              activeIcon: Icon(Icons.chat_bubble),
+              label: 'Messages'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_circle_outlined),
+              activeIcon: Icon(Icons.account_circle),
+              label: 'Profile'),
         ],
       ),
     );
   }
 }
 
-class _DashboardOption extends StatelessWidget {
+class _DoctorCard extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String subtitle;
+  final Color color;
   final VoidCallback onTap;
 
-  const _DashboardOption({required this.icon, required this.label, required this.onTap});
+  const _DoctorCard(
+      {required this.icon,
+      required this.label,
+      required this.subtitle,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
-        child: Card(
-          color: Colors.white,
-          margin: EdgeInsets.all(10),
-          elevation: 5,
-          child: ListTile(
-            leading: Icon(icon, color: Colors.blue),
-            title: Text(label, style: TextStyle(fontSize: 16)),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kCardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(height: 12),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: kTextPrimary)),
+              const SizedBox(height: 2),
+              Text(subtitle,
+                  style: const TextStyle(
+                      fontSize: 11, color: kTextSecondary)),
+            ],
           ),
         ),
       ),
@@ -167,3 +292,30 @@ class _DashboardOption extends StatelessWidget {
   }
 }
 
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+
+  const _EmptyState({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorder),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: const Color(0xFFCBD5E1)),
+          const SizedBox(height: 10),
+          Text(message,
+              style: const TextStyle(color: kTextSecondary, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}

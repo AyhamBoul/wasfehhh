@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_theme.dart';
 import 'notification_service.dart';
 
 class _MedicationEntry {
@@ -22,36 +23,40 @@ class MedicationSchedulePage extends StatefulWidget {
   const MedicationSchedulePage({super.key});
 
   @override
-  State<MedicationSchedulePage> createState() => _MedicationSchedulePageState();
+  State<MedicationSchedulePage> createState() =>
+      _MedicationSchedulePageState();
 }
 
 class _MedicationSchedulePageState extends State<MedicationSchedulePage> {
-  int _selectedDayIndex = 0;
-  final List<String> _days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  late int _selectedDayIndex;
+  final List<String> _days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  final List<String> _daysFull = [
+    'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+  ];
 
   final List<_MedicationEntry> _medications = [
     _MedicationEntry(
         time: '08:00 AM',
         medication: 'Amoxicillin',
-        dosage: '1 capsule • Post-meal',
+        dosage: '500mg · 1 capsule · Post-meal',
         hour: 8,
         minute: 0),
     _MedicationEntry(
         time: '02:00 PM',
         medication: 'Amoxicillin',
-        dosage: '1 capsule • Post-meal',
+        dosage: '500mg · 1 capsule · Post-meal',
         hour: 14,
         minute: 0),
     _MedicationEntry(
         time: '09:00 PM',
         medication: 'Melatonin',
-        dosage: '1 capsule • Post-meal',
+        dosage: '5mg · 1 capsule · Before sleep',
         hour: 21,
         minute: 0),
     _MedicationEntry(
         time: '10:00 PM',
         medication: 'Amoxicillin',
-        dosage: '1 capsule • Post-meal',
+        dosage: '500mg · 1 capsule · Post-meal',
         hour: 22,
         minute: 0),
   ];
@@ -59,6 +64,7 @@ class _MedicationSchedulePageState extends State<MedicationSchedulePage> {
   @override
   void initState() {
     super.initState();
+    _selectedDayIndex = DateTime.now().weekday % 7;
     _scheduleNotifications();
   }
 
@@ -78,20 +84,16 @@ class _MedicationSchedulePageState extends State<MedicationSchedulePage> {
   }
 
   void _toggleTaken(int index) {
-    setState(() {
-      _medications[index].isTaken = !_medications[index].isTaken;
-    });
-
+    setState(() => _medications[index].isTaken = !_medications[index].isTaken);
     if (_medications[index].isTaken) {
       NotificationService().cancelById(index);
     } else {
       final med = _medications[index];
       NotificationService().scheduleMedicationReminder(
-        id: index,
-        medicationName: med.medication,
-        hour: med.hour,
-        minute: med.minute,
-      );
+          id: index,
+          medicationName: med.medication,
+          hour: med.hour,
+          minute: med.minute);
     }
   }
 
@@ -99,104 +101,185 @@ class _MedicationSchedulePageState extends State<MedicationSchedulePage> {
 
   @override
   Widget build(BuildContext context) {
+    final Map<dynamic, dynamic>? args =
+        ModalRoute.of(context)?.settings.arguments as Map<dynamic, dynamic>?;
+    final String firstName = args?['firstName'] as String? ?? 'User';
+    final Map<String, String> userArgs = {'firstName': firstName};
+
+    final now = DateTime.now();
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final monthLabel = '${months[now.month - 1]} ${now.year}';
+
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('My Schedule'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications),
+            icon: const Icon(Icons.notifications_outlined),
             onPressed: () {},
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'December 2025',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(_days.length, (i) {
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedDayIndex = i),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _selectedDayIndex == i
-                          ? Colors.blue
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _days[i],
-                        style: TextStyle(
-                          color: _selectedDayIndex == i
-                              ? Colors.white
-                              : Colors.blue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Calendar strip ──
+          Container(
+            color: kCardBg,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(monthLabel,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary)),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(7, (i) {
+                    final isToday = i == DateTime.now().weekday % 7;
+                    final isSelected = i == _selectedDayIndex;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedDayIndex = i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 40,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: isSelected ? kPrimary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isToday && !isSelected
+                                ? kPrimary
+                                : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(_days[i],
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : kTextSecondary)),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${(now.day - (DateTime.now().weekday % 7) + i).clamp(1, 31)}',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : kTextPrimary),
+                            ),
+                          ],
                         ),
                       ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Progress bar ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${_daysFull[_selectedDayIndex]}\'s Routine',
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary),
                     ),
+                    Text('$_takenCount / ${_medications.length} taken',
+                        style: const TextStyle(
+                            fontSize: 13, color: kTextSecondary)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _medications.isEmpty
+                        ? 0
+                        : _takenCount / _medications.length,
+                    backgroundColor: kBorder,
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(kSuccess),
+                    minHeight: 6,
                   ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── List ──
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              itemCount: _medications.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final med = _medications[i];
+                return _MedicationItem(
+                  time: med.time,
+                  medication: med.medication,
+                  dosage: med.dosage,
+                  isTaken: med.isTaken,
+                  onToggle: () => _toggleTaken(i),
                 );
-              }),
+              },
             ),
-            const SizedBox(height: 20),
-            Text(
-              "Today's Routine $_takenCount of ${_medications.length} taken",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _medications.length,
-                itemBuilder: (context, index) {
-                  final med = _medications[index];
-                  return _MedicationItem(
-                    time: med.time,
-                    medication: med.medication,
-                    dosage: med.dosage,
-                    isTaken: med.isTaken,
-                    onToggle: () => _toggleTaken(index),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 1,
-        onTap: (index) {
-          switch (index) {
+        onTap: (i) {
+          switch (i) {
             case 0:
-              Navigator.pushReplacementNamed(context, '/patient-dashboard');
+              Navigator.pushReplacementNamed(context, '/patient-dashboard',
+                  arguments: userArgs);
             case 2:
-              Navigator.pushReplacementNamed(context, '/pharmacy');
+              Navigator.pushReplacementNamed(context, '/pharmacy',
+                  arguments: userArgs);
             case 3:
               Navigator.pushReplacementNamed(context, '/signin');
           }
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today), label: 'Calendar'),
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.local_pharmacy), label: 'Pharmacy'),
+              icon: Icon(Icons.calendar_today_outlined),
+              activeIcon: Icon(Icons.calendar_today),
+              label: 'Calendar'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.account_circle), label: 'Profile'),
+              icon: Icon(Icons.local_pharmacy_outlined),
+              activeIcon: Icon(Icons.local_pharmacy),
+              label: 'Pharmacy'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_circle_outlined),
+              activeIcon: Icon(Icons.account_circle),
+              label: 'Profile'),
         ],
       ),
     );
@@ -220,44 +303,98 @@ class _MedicationItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: ListTile(
-        leading: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              time.split(' ')[0],
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            Text(
-              time.split(' ').length > 1 ? time.split(' ')[1] : '',
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-          ],
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isTaken
+            ? kSuccess.withValues(alpha: 0.06)
+            : kCardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isTaken ? kSuccess.withValues(alpha: 0.3) : kBorder,
         ),
-        title: Text(
-          medication,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            decoration: isTaken ? TextDecoration.lineThrough : null,
-            color: isTaken ? Colors.grey : Colors.black,
-          ),
-        ),
-        subtitle: Text(dosage),
-        trailing: GestureDetector(
-          onTap: onToggle,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Icon(
-              isTaken ? Icons.check_circle : Icons.radio_button_unchecked,
-              key: ValueKey(isTaken),
-              color: isTaken ? Colors.green : Colors.blue,
-              size: 28,
+      ),
+      child: Row(
+        children: [
+          // Time column
+          SizedBox(
+            width: 52,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  time.split(' ')[0],
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: isTaken ? kTextSecondary : kPrimary),
+                ),
+                Text(
+                  time.split(' ').length > 1 ? time.split(' ')[1] : '',
+                  style: const TextStyle(
+                      fontSize: 10, color: kTextSecondary),
+                ),
+              ],
             ),
           ),
-        ),
+          Container(
+            width: 1,
+            height: 36,
+            color: kBorder,
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  medication,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: isTaken ? kTextSecondary : kTextPrimary,
+                    decoration: isTaken ? TextDecoration.lineThrough : null,
+                    decorationColor: kTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(dosage,
+                    style: const TextStyle(
+                        fontSize: 12, color: kTextSecondary)),
+              ],
+            ),
+          ),
+          // Toggle
+          GestureDetector(
+            onTap: onToggle,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: isTaken
+                  ? Container(
+                      key: const ValueKey('taken'),
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: kSuccess,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.check,
+                          color: Colors.white, size: 18),
+                    )
+                  : Container(
+                      key: const ValueKey('pending'),
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: kBorder, width: 1.5),
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }

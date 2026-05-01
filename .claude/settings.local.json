@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(flutter pub *)",
-      "Bash(flutter analyze *)"
+      "Bash(flutter analyze *)",
+      "Bash(git -C /Users/ayhamita/Downloads/wasfehhh remote -v)",
+      "Bash(git -C /Users/ayhamita/Downloads/wasfehhh status --short)"
     ]
   }
 }
