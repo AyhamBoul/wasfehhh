@@ -245,7 +245,8 @@ class _PharmacyPageState extends State<PharmacyPage> {
               Navigator.pushReplacementNamed(context, '/medication-schedule',
                   arguments: userArgs);
             case 3:
-              Navigator.pushReplacementNamed(context, '/signin');
+              Navigator.pushReplacementNamed(context, '/profile',
+                  arguments: userArgs);
           }
         },
         items: const [

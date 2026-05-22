@@ -16,6 +16,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController nationalIdController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController licenseController = TextEditingController();
   bool _isLoading = false;
   bool _obscure = true;
 
@@ -25,6 +26,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     emailController.dispose();
     nationalIdController.dispose();
     passwordController.dispose();
+    licenseController.dispose();
     super.dispose();
   }
 
@@ -47,24 +49,40 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   Future<void> _createAccount() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
+    final needsLicense =
+        selectedRole == 'Doctor' || selectedRole == 'Pharmacist';
+    if (needsLicense && licenseController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('License number is required for this role.'),
+            backgroundColor: kDanger),
+      );
+      setState(() => _isLoading = false);
+      return;
+    }
+
     final error = await AuthService().register(
       nationalId: nationalIdController.text.trim(),
       password: passwordController.text,
       fullName: fullNameController.text.trim(),
       email: emailController.text.trim(),
       role: selectedRole,
+      licenseNumber: needsLicense ? licenseController.text.trim() : null,
     );
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (error != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error), backgroundColor: kDanger));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error), backgroundColor: kDanger));
       return;
     }
     Navigator.pushReplacementNamed(
       context,
       _routeForRole(selectedRole),
-      arguments: {'firstName': _extractFirstName(fullNameController.text.trim())},
+      arguments: {
+        'firstName': _extractFirstName(fullNameController.text.trim()),
+      },
     );
   }
 
@@ -79,7 +97,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               // ── Gradient header ──
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(28, 40, 28, 32),
+                padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
                 decoration: const BoxDecoration(
                   gradient: kGradient,
                   borderRadius: BorderRadius.only(
@@ -90,6 +108,25 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    GestureDetector(
+                      onTap: () async {
+                        final popped = await Navigator.maybePop(context);
+                        if (!popped && context.mounted) {
+                          Navigator.pushReplacementNamed(context, '/signin');
+                        }
+                      },
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.arrow_back_ios_new,
+                            color: Colors.white, size: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Container(
                       width: 56,
                       height: 56,
@@ -97,8 +134,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.health_and_safety_rounded,
-                          color: Colors.white, size: 30),
+                      child: const Icon(
+                        Icons.health_and_safety_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     const Text(
@@ -114,8 +154,9 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     Text(
                       'Join the Wasfeh health ecosystem',
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 14),
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -131,11 +172,14 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                       const SizedBox(height: 8),
 
                       // Role selector
-                      const Text('I am a',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: kTextPrimary)),
+                      const Text(
+                        'I am a',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary,
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Row(
                         children: ['Patient', 'Doctor', 'Pharmacist'].map((r) {
@@ -146,7 +190,9 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
                                 margin: const EdgeInsets.only(right: 8),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
                                   color: selected ? kPrimary : kCardBg,
                                   borderRadius: BorderRadius.circular(10),
@@ -161,18 +207,24 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                                       r == 'Patient'
                                           ? Icons.person_outline
                                           : r == 'Doctor'
-                                              ? Icons.medical_services_outlined
-                                              : Icons.local_pharmacy_outlined,
-                                      color: selected ? Colors.white : kTextSecondary,
+                                          ? Icons.medical_services_outlined
+                                          : Icons.local_pharmacy_outlined,
+                                      color: selected
+                                          ? Colors.white
+                                          : kTextSecondary,
                                       size: 20,
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(r,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: selected ? Colors.white : kTextSecondary,
-                                        )),
+                                    Text(
+                                      r,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: selected
+                                            ? Colors.white
+                                            : kTextSecondary,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -192,8 +244,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                             : null,
                         decoration: const InputDecoration(
                           hintText: 'e.g. Ahmad Nasser',
-                          prefixIcon: Icon(Icons.person_outline,
-                              color: kTextSecondary, size: 20),
+                          prefixIcon: Icon(
+                            Icons.person_outline,
+                            color: kTextSecondary,
+                            size: 20,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -211,8 +266,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                         },
                         decoration: const InputDecoration(
                           hintText: 'you@example.com',
-                          prefixIcon: Icon(Icons.email_outlined,
-                              color: kTextSecondary, size: 20),
+                          prefixIcon: Icon(
+                            Icons.email_outlined,
+                            color: kTextSecondary,
+                            size: 20,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -226,11 +284,34 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                             : null,
                         decoration: const InputDecoration(
                           hintText: 'e.g. PAT-001',
-                          prefixIcon: Icon(Icons.badge_outlined,
-                              color: kTextSecondary, size: 20),
+                          prefixIcon: Icon(
+                            Icons.badge_outlined,
+                            color: kTextSecondary,
+                            size: 20,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
+
+                      // License number — only for Doctor / Pharmacist
+                      if (selectedRole == 'Doctor' ||
+                          selectedRole == 'Pharmacist') ...[
+                        _fieldLabel(selectedRole == 'Doctor'
+                            ? 'Medical License Number'
+                            : 'Pharmacy License Number'),
+                        const SizedBox(height: 6),
+                        TextFormField(
+                          controller: licenseController,
+                          decoration: InputDecoration(
+                            hintText: selectedRole == 'Doctor'
+                                ? 'e.g. LIC-DR-2024-001'
+                                : 'e.g. LIC-PH-2024-001',
+                            prefixIcon: const Icon(Icons.verified_outlined,
+                                color: kTextSecondary, size: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
 
                       _fieldLabel('Password'),
                       const SizedBox(height: 6),
@@ -242,8 +323,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                             : null,
                         decoration: InputDecoration(
                           hintText: '••••••••',
-                          prefixIcon: const Icon(Icons.lock_outline,
-                              color: kTextSecondary, size: 20),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            color: kTextSecondary,
+                            size: 20,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscure
@@ -252,7 +336,8 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                               color: kTextSecondary,
                               size: 20,
                             ),
-                            onPressed: () => setState(() => _obscure = !_obscure),
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
                           ),
                         ),
                       ),
@@ -267,7 +352,9 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                                   height: 20,
                                   width: 20,
                                   child: CircularProgressIndicator(
-                                      color: Colors.white, strokeWidth: 2),
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text('Create Account'),
                         ),
@@ -276,30 +363,45 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text('Already have an account?',
-                              style: TextStyle(
-                                  color: kTextSecondary, fontSize: 14)),
+                          const Text(
+                            'Already have an account?',
+                            style: TextStyle(
+                              color: kTextSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
                           TextButton(
                             onPressed: () => Navigator.pushReplacementNamed(
-                                context, '/signin'),
+                              context,
+                              '/signin',
+                            ),
                             style: TextButton.styleFrom(
-                                foregroundColor: kPrimary,
-                                padding: const EdgeInsets.only(left: 4)),
-                            child: const Text('Sign In',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14)),
+                              foregroundColor: kPrimary,
+                              padding: const EdgeInsets.only(left: 4),
+                            ),
+                            child: const Text(
+                              'Sign In',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                       Center(
                         child: TextButton(
                           onPressed: () => Navigator.pushReplacementNamed(
-                              context, '/guest-home'),
+                            context,
+                            '/guest-home',
+                          ),
                           style: TextButton.styleFrom(
-                              foregroundColor: kTextSecondary),
-                          child: const Text('Continue as Guest',
-                              style: TextStyle(fontSize: 13)),
+                            foregroundColor: kTextSecondary,
+                          ),
+                          child: const Text(
+                            'Continue as Guest',
+                            style: TextStyle(fontSize: 13),
+                          ),
                         ),
                       ),
                     ],
@@ -315,10 +417,11 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
 }
 
 Widget _fieldLabel(String text) => Text(
-      text,
-      style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: kTextPrimary,
-          letterSpacing: 0.2),
-    );
+  text,
+  style: const TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: kTextPrimary,
+    letterSpacing: 0.2,
+  ),
+);

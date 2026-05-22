@@ -1,229 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-
-class DoctorPharmacistChat extends StatefulWidget {
-  final String firstName;
-  final String userRole; // 'doctor' or 'pharmacist'
-
-  const DoctorPharmacistChat({
-    required this.firstName,
-    required this.userRole,
-    super.key,
-  });
-
-  @override
-  State<DoctorPharmacistChat> createState() => _DoctorPharmacistChatState();
-}
-
-class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
-  final TextEditingController _messageController = TextEditingController();
-  final List<ChatMessage> messages = [
-    ChatMessage(
-      sender: 'pharmacist',
-      senderName: 'الصيدلاني',
-      text: 'السلام عليكم، هل هناك أي استفسارات بخصوص الأدوية؟',
-      timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-    ),
-    ChatMessage(
-      sender: 'doctor',
-      senderName: 'الدكتور',
-      text: 'عليكم السلام، أنا بحاجة للتحقق من توفر الدواء ABC',
-      timestamp: DateTime.now().subtract(const Duration(minutes: 3)),
-    ),
-    ChatMessage(
-      sender: 'pharmacist',
-      senderName: 'الصيدلاني',
-      text: 'الدواء متوفر ولدينا كمية كافية',
-      timestamp: DateTime.now().subtract(const Duration(minutes: 1)),
-    ),
-  ];
-
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-
-    setState(() {
-      messages.add(
-        ChatMessage(
-          sender: widget.userRole,
-          senderName: widget.userRole == 'doctor' ? 'الدكتور' : 'الصيدلاني',
-          text: _messageController.text,
-          timestamp: DateTime.now(),
-        ),
-      );
-      _messageController.clear();
-    });
-  }
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.userRole == 'doctor'
-                        ? 'محادثة مع الصيدلاني'
-                        : 'محادثة مع الدكتور',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ),
-          // Messages List
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final message = messages[index];
-                final isCurrentUser = message.sender == widget.userRole;
-
-                return Align(
-                  alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isCurrentUser ? Colors.blue : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          message.senderName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isCurrentUser ? Colors.white70 : Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          message.text,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isCurrentUser ? Colors.white : Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _formatTime(message.timestamp),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isCurrentUser ? Colors.white54 : Colors.grey[500],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // Message Input
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.grey[300]!)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: 'اكتب رسالتك...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: const BorderSide(color: Colors.grey),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: const BorderSide(color: Colors.blue),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    minLines: 1,
-                    maxLines: 3,
-                    textDirection: TextDirection.rtl,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white),
-                    onPressed: _sendMessage,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return 'الآن';
-    } else if (difference.inMinutes < 60) {
-      return 'قبل ${difference.inMinutes} دقيقة';
-    } else if (difference.inHours < 24) {
-      return 'قبل ${difference.inHours} ساعة';
-    } else {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    }
-  }
-}
+import 'package:shared_preferences/shared_preferences.dart';
+import 'app_theme.dart';
 
 class ChatMessage {
   final String sender; // 'doctor' or 'pharmacist'
@@ -237,4 +15,367 @@ class ChatMessage {
     required this.text,
     required this.timestamp,
   });
+
+  Map<String, dynamic> toJson() => {
+        'sender': sender,
+        'senderName': senderName,
+        'text': text,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+      };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
+        sender: j['sender'] as String,
+        senderName: j['senderName'] as String,
+        text: j['text'] as String,
+        timestamp:
+            DateTime.fromMillisecondsSinceEpoch(j['timestamp'] as int),
+      );
+}
+
+class DoctorPharmacistChat extends StatefulWidget {
+  final String firstName;
+  final String userRole;
+
+  const DoctorPharmacistChat({
+    required this.firstName,
+    required this.userRole,
+    super.key,
+  });
+
+  @override
+  State<DoctorPharmacistChat> createState() => _DoctorPharmacistChatState();
+}
+
+class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
+  static const _key = 'qm_chat_messages';
+
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scroll = ScrollController();
+  List<ChatMessage> _messages = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    List<ChatMessage> loaded = [];
+    if (raw != null) {
+      final list = jsonDecode(raw) as List<dynamic>;
+      loaded = list
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    if (loaded.isEmpty) {
+      loaded = [
+        ChatMessage(
+          sender: 'pharmacist',
+          senderName: 'Pharmacist',
+          text: 'Hello! Any questions about medications or stock?',
+          timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
+        ),
+        ChatMessage(
+          sender: 'doctor',
+          senderName: 'Doctor',
+          text: 'Hi! I need to check availability of Amoxicillin 500mg.',
+          timestamp: DateTime.now().subtract(const Duration(minutes: 8)),
+        ),
+        ChatMessage(
+          sender: 'pharmacist',
+          senderName: 'Pharmacist',
+          text: 'We have sufficient stock. How many units do you need?',
+          timestamp: DateTime.now().subtract(const Duration(minutes: 6)),
+        ),
+      ];
+      await _saveMessages(loaded);
+    }
+    if (mounted) {
+      setState(() {
+        _messages = loaded;
+        _loading = false;
+      });
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _saveMessages(List<ChatMessage> msgs) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _key, jsonEncode(msgs.map((m) => m.toJson()).toList()));
+  }
+
+  void _sendMessage() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    final msg = ChatMessage(
+      sender: widget.userRole,
+      senderName: widget.userRole == 'doctor' ? 'Doctor' : 'Pharmacist',
+      text: text,
+      timestamp: DateTime.now(),
+    );
+    setState(() => _messages.add(msg));
+    _controller.clear();
+    _saveMessages(_messages);
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  String _formatTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final otherRole =
+        widget.userRole == 'doctor' ? 'Pharmacist' : 'Doctor';
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.88,
+      decoration: const BoxDecoration(
+        color: kBg,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: kBorder,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 16),
+            decoration: const BoxDecoration(
+              color: kCardBg,
+              border: Border(bottom: BorderSide(color: kBorder)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: kGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    widget.userRole == 'doctor'
+                        ? Icons.local_pharmacy_outlined
+                        : Icons.medical_services_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Chat with $otherRole',
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary),
+                      ),
+                      const Text(
+                        'Secure professional channel',
+                        style:
+                            TextStyle(fontSize: 11, color: kTextSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: kTextSecondary),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+
+          // Messages
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: kPrimary))
+                : ListView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    itemCount: _messages.length,
+                    itemBuilder: (_, i) {
+                      final msg = _messages[i];
+                      final isMe = msg.sender == widget.userRole;
+                      final showTime = i == 0 ||
+                          msg.timestamp
+                                  .difference(_messages[i - 1].timestamp)
+                                  .inMinutes >
+                              30;
+
+                      return Column(
+                        children: [
+                          if (showTime)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                _formatTime(msg.timestamp),
+                                style: const TextStyle(
+                                    fontSize: 11, color: kTextSecondary),
+                              ),
+                            ),
+                          Align(
+                            alignment: isMe
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              margin: EdgeInsets.only(
+                                bottom: 6,
+                                left: isMe ? 56 : 0,
+                                right: isMe ? 0 : 56,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isMe ? kPrimary : kCardBg,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(16),
+                                  topRight: const Radius.circular(16),
+                                  bottomLeft:
+                                      Radius.circular(isMe ? 16 : 4),
+                                  bottomRight:
+                                      Radius.circular(isMe ? 4 : 16),
+                                ),
+                                border: isMe
+                                    ? null
+                                    : Border.all(color: kBorder),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black
+                                        .withValues(alpha: 0.04),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: isMe
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    msg.senderName,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isMe
+                                          ? Colors.white
+                                              .withValues(alpha: 0.7)
+                                          : kTextSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    msg.text,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isMe
+                                          ? Colors.white
+                                          : kTextPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+
+          // Input bar
+          Container(
+            padding: EdgeInsets.fromLTRB(
+                16,
+                10,
+                16,
+                10 + MediaQuery.of(context).viewInsets.bottom),
+            decoration: const BoxDecoration(
+              color: kCardBg,
+              border: Border(top: BorderSide(color: kBorder)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    minLines: 1,
+                    maxLines: 4,
+                    onSubmitted: (_) => _sendMessage(),
+                    decoration: const InputDecoration(
+                      hintText: 'Type a message...',
+                      contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _sendMessage,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: kGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.send_rounded,
+                        color: Colors.white, size: 20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

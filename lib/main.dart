@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
 import 'createaccount.dart';
+import 'profile_page.dart';
 import 'signin.dart';
 import 'PatientDashboardPage.dart';
 import 'DoctorDashboardPage .dart';
@@ -29,7 +30,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Wasfeh',
       theme: buildTheme(),
-      home: const CreateAccountPage(),
+      home: const SignInPage(),
       routes: {
         '/create-account': (context) => const CreateAccountPage(),
         '/signin': (context) => const SignInPage(),
@@ -42,6 +43,7 @@ class MyApp extends StatelessWidget {
         '/prescription-scanner': (context) => const PrescriptionScannerPage(),
         '/patient-records': (context) => const PatientRecordsPage(),
         '/guest-home': (context) => const GuestHomePage(),
+        '/profile': (context) => const ProfilePage(),
       },
     );
   }

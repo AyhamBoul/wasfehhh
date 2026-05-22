@@ -212,7 +212,7 @@ class _SignInPageState extends State<SignInPage> {
                               style: TextStyle(
                                   color: kTextSecondary, fontSize: 14)),
                           TextButton(
-                            onPressed: () => Navigator.pushReplacementNamed(
+                            onPressed: () => Navigator.pushNamed(
                                 context, '/create-account'),
                             style: TextButton.styleFrom(
                                 foregroundColor: kPrimary,

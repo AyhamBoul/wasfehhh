@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'auth_service.dart';
 
 class PrescriptionScannerPage extends StatefulWidget {
   const PrescriptionScannerPage({super.key});
@@ -34,7 +35,29 @@ class _PrescriptionScannerPageState extends State<PrescriptionScannerPage> {
 
     setState(() => _scanned = true);
     _controller.stop();
-    _showPrescriptionDialog(raw);
+    _handleScannedQr(raw);
+  }
+
+  Future<void> _handleScannedQr(String raw) async {
+    final parts = raw.split('|');
+    if (parts.length < 4) {
+      _showInvalidDialog();
+      return;
+    }
+    final patientId = parts[1];
+    final prescriptionId = parts.length > 5 ? parts[5] : '';
+
+    if (prescriptionId.isNotEmpty) {
+      final prescriptions = await AuthService().getPrescriptions(patientId);
+      final existing =
+          prescriptions.where((p) => p.id == prescriptionId).firstOrNull;
+      if (existing != null && existing.isDispensed) {
+        if (mounted) _showAlreadyDispensedDialog(patientId);
+        return;
+      }
+    }
+
+    if (mounted) _showPrescriptionDialog(raw);
   }
 
   void _showPrescriptionDialog(String raw) {
@@ -48,6 +71,7 @@ class _PrescriptionScannerPageState extends State<PrescriptionScannerPage> {
     final medsRaw = parts[2].split(';');
     final notes = parts[3];
     final timestamp = parts.length > 4 ? parts[4] : '';
+    final prescriptionId = parts.length > 5 ? parts[5] : '';
 
     final meds = medsRaw.map((m) {
       final mp = m.split(':');
@@ -117,15 +141,50 @@ class _PrescriptionScannerPageState extends State<PrescriptionScannerPage> {
             child: const Text('Scan Another'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context, {'dispensed': true, 'patientId': patientId});
-            },
+            onPressed: prescriptionId.isEmpty
+                ? null
+                : () async {
+                    Navigator.pop(ctx);
+                    final saved = await AuthService()
+                        .markDispensed(prescriptionId, patientId);
+                    if (!mounted) return;
+                    Navigator.pop(context, {
+                      'dispensed': saved,
+                      'patientId': patientId,
+                    });
+                  },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text(
               'Mark as Dispensed',
               style: TextStyle(color: Colors.white),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAlreadyDispensedDialog(String patientId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Already Dispensed'),
+          ],
+        ),
+        content: Text(
+            'This prescription for patient $patientId has already been dispensed.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _scanned = false);
+              _controller.start();
+            },
+            child: const Text('Scan Another'),
           ),
         ],
       ),

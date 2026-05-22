@@ -97,23 +97,49 @@ class _GuestHomePageState extends State<GuestHomePage> {
                                     letterSpacing: -0.5)),
                           ],
                         ),
-                        TextButton.icon(
-                          onPressed: () => Navigator.pushReplacementNamed(
-                              context, '/signin'),
-                          style: TextButton.styleFrom(
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.2),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20)),
-                          ),
-                          icon: const Icon(Icons.login, size: 16),
-                          label: const Text('Sign In',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13)),
+                        Row(
+                          children: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pushReplacementNamed(
+                                      context, '/create-account'),
+                              style: TextButton.styleFrom(
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.15),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 7),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(20)),
+                              ),
+                              child: const Text('Sign Up',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12)),
+                            ),
+                            const SizedBox(width: 6),
+                            TextButton.icon(
+                              onPressed: () =>
+                                  Navigator.pushReplacementNamed(
+                                      context, '/signin'),
+                              style: TextButton.styleFrom(
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.25),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 7),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(20)),
+                              ),
+                              icon: const Icon(Icons.login, size: 14),
+                              label: const Text('Sign In',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12)),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -143,13 +169,13 @@ class _GuestHomePageState extends State<GuestHomePage> {
                           TextButton(
                             onPressed: () =>
                                 Navigator.pushReplacementNamed(
-                                    context, '/create-account'),
+                                    context, '/signin'),
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.only(left: 8),
                               minimumSize: Size.zero,
                             ),
-                            child: const Text('Register',
+                            child: const Text('Sign In',
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,

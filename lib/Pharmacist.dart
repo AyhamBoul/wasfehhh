@@ -1,10 +1,141 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
+import 'auth_service.dart';
 import 'doctor_pharmacist_chat.dart';
 import 'prescription_scanner_page.dart';
 
-class PharmacistPortalPage extends StatelessWidget {
+class PharmacistPortalPage extends StatefulWidget {
   const PharmacistPortalPage({super.key});
+
+  @override
+  State<PharmacistPortalPage> createState() => _PharmacistPortalPageState();
+}
+
+class _PharmacistPortalPageState extends State<PharmacistPortalPage> {
+  final TextEditingController _lookupController = TextEditingController();
+  List<Prescription> _pending = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPending();
+  }
+
+  @override
+  void dispose() {
+    _lookupController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPending() async {
+    final id = AuthService().currentUser?.nationalId;
+    if (id == null) return;
+    final list = await AuthService().getPharmPending(id);
+    if (mounted) setState(() => _pending = list);
+  }
+
+  Future<void> _openScanner() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const PrescriptionScannerPage()),
+    );
+    if (result != null && result['dispensed'] == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Dispensed for patient ${result['patientId']}'),
+          backgroundColor: kSuccess,
+        ),
+      );
+      await _loadPending();
+    }
+  }
+
+  Future<void> _lookupPatient() async {
+    final id = _lookupController.text.trim();
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a National ID to search.')),
+      );
+      return;
+    }
+    final pharmId = AuthService().currentUser?.nationalId;
+    final results = await Future.wait([
+      AuthService().findUser(id),
+      AuthService().getPrescriptions(id),
+    ]);
+    if (!mounted) return;
+    final user = results[0] as AuthUser?;
+    final prescriptions = results[1] as List<Prescription>;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No patient found for "$id".'),
+          backgroundColor: kDanger,
+        ),
+      );
+      return;
+    }
+    // Queue undispensed prescriptions for this pharmacist.
+    if (pharmId != null && prescriptions.any((p) => !p.isDispensed)) {
+      await AuthService().addToPharmPending(pharmId, prescriptions);
+      await _loadPending();
+    }
+    if (!mounted) return;
+    final activePrescriptions = prescriptions.where((p) => !p.isDispensed).toList();
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: kPrimary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.person_outline,
+                        color: kPrimary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Patient Found',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _LookupRow(label: 'Name', value: user.fullName),
+              _LookupRow(label: 'National ID', value: user.nationalId),
+              _LookupRow(label: 'Email', value: user.email),
+              _LookupRow(
+                label: 'Rx',
+                value: activePrescriptions.isEmpty
+                    ? 'No active prescriptions'
+                    : '${activePrescriptions.length} active — added to queue',
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,23 +144,7 @@ class PharmacistPortalPage extends StatelessWidget {
     final String firstName =
         (args?['firstName'] as String? ?? '').trim().isNotEmpty
             ? args!['firstName'] as String
-            : 'Pharmacist';
-
-    Future<void> openScanner() async {
-      final result = await Navigator.push<Map<String, dynamic>>(
-        context,
-        MaterialPageRoute(builder: (_) => const PrescriptionScannerPage()),
-      );
-      if (result != null && result['dispensed'] == true && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text('Dispensed for patient ${result['patientId']}'),
-            backgroundColor: kSuccess,
-          ),
-        );
-      }
-    }
+            : AuthService().currentUser?.firstName ?? 'Pharmacist';
 
     return Scaffold(
       backgroundColor: kBg,
@@ -89,7 +204,7 @@ class PharmacistPortalPage extends StatelessWidget {
                     const SizedBox(height: 20),
                     // Scan CTA
                     GestureDetector(
-                      onTap: openScanner,
+                      onTap: _openScanner,
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -150,18 +265,24 @@ class PharmacistPortalPage extends StatelessWidget {
                             color: kTextPrimary)),
                     const SizedBox(height: 10),
                     TextField(
+                      controller: _lookupController,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _lookupPatient(),
                       decoration: InputDecoration(
                         hintText: 'Enter patient National ID...',
                         prefixIcon: const Icon(Icons.search,
                             color: kTextSecondary, size: 20),
-                        suffixIcon: Container(
-                          margin: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: kPrimary,
-                            borderRadius: BorderRadius.circular(8),
+                        suffixIcon: GestureDetector(
+                          onTap: _lookupPatient,
+                          child: Container(
+                            margin: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: kPrimary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.arrow_forward,
+                                color: Colors.white, size: 18),
                           ),
-                          child: const Icon(Icons.arrow_forward,
-                              color: Colors.white, size: 18),
                         ),
                       ),
                     ),
@@ -180,7 +301,7 @@ class PharmacistPortalPage extends StatelessWidget {
                           label: 'Open Scanner',
                           subtitle: 'Scan QR code',
                           color: const Color(0xFF7C3AED),
-                          onTap: openScanner,
+                          onTap: _openScanner,
                         ),
                         const SizedBox(width: 12),
                         _PharmCard(
@@ -209,16 +330,83 @@ class PharmacistPortalPage extends StatelessWidget {
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 color: kTextPrimary)),
-                        Text('0 pending',
-                            style: TextStyle(
+                        Text('${_pending.length} pending',
+                            style: const TextStyle(
                                 fontSize: 13, color: kTextSecondary)),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _EmptyState(
-                      icon: Icons.inbox_outlined,
-                      message: 'No pending refill requests right now.',
-                    ),
+                    if (_pending.isEmpty)
+                      _EmptyState(
+                        icon: Icons.inbox_outlined,
+                        message: 'No pending refill requests right now.',
+                      )
+                    else
+                      ..._pending.map((rx) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: kCardBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: kBorder),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryLight,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.medication,
+                                        color: kPrimary, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Patient: ${rx.patientId}',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              color: kTextPrimary),
+                                        ),
+                                        Text(
+                                          rx.medications.isNotEmpty
+                                              ? '${rx.medications.first.name} · ${rx.medications.length} med(s)'
+                                              : 'Prescription',
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              color: kTextSecondary),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          kWarning.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      'Pending',
+                                      style: TextStyle(
+                                          color: kWarning,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )),
                   ],
                 ),
               ),
@@ -231,7 +419,7 @@ class PharmacistPortalPage extends StatelessWidget {
         onTap: (i) async {
           switch (i) {
             case 1:
-              await openScanner();
+              await _openScanner();
             case 2:
               showModalBottomSheet(
                 context: context,
@@ -241,7 +429,8 @@ class PharmacistPortalPage extends StatelessWidget {
                     firstName: firstName, userRole: 'pharmacist'),
               );
             case 3:
-              Navigator.pushReplacementNamed(context, '/signin');
+              Navigator.pushReplacementNamed(context, '/profile',
+                  arguments: {'firstName': firstName});
           }
         },
         items: const [
@@ -348,4 +537,35 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LookupRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _LookupRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 80,
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kTextSecondary)),
+            ),
+            Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: kTextPrimary)),
+            ),
+          ],
+        ),
+      );
 }

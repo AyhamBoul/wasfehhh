@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'app_theme.dart';
+import 'auth_service.dart';
 import 'doctor_pharmacist_chat.dart';
+
+const _units = ['mg', 'ml', 'mcg', 'g', 'IU', 'tablet(s)', 'capsule(s)', 'unit(s)'];
 
 class _MedEntry {
   final TextEditingController name = TextEditingController();
-  final TextEditingController dosage = TextEditingController();
+  final TextEditingController amount = TextEditingController();
+  String unit = 'mg';
   final TextEditingController frequency = TextEditingController();
 
   void dispose() {
     name.dispose();
-    dosage.dispose();
+    amount.dispose();
     frequency.dispose();
   }
 
   bool get isValid =>
       name.text.trim().isNotEmpty &&
-      dosage.text.trim().isNotEmpty &&
+      amount.text.trim().isNotEmpty &&
       frequency.text.trim().isNotEmpty;
+
+  String get dosageString => '${amount.text.trim()} $unit';
 }
 
 class NewPrescriptionPage extends StatefulWidget {
@@ -64,31 +70,50 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
     return null;
   }
 
-  String _buildQrData() {
+  String _buildQrData(String prescriptionId) {
     final patientId = _patientIdController.text.trim();
     final medsEncoded = _medications
         .map((m) =>
-            '${m.name.text.trim()}:${m.dosage.text.trim()}:${m.frequency.text.trim()}')
+            '${m.name.text.trim()}:${m.dosageString}:${m.frequency.text.trim()}')
         .join(';');
     final notes = _notesController.text.trim();
     final now = DateTime.now();
     final ts =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    return 'QM|$patientId|$medsEncoded|$notes|$ts';
+    return 'QM|$patientId|$medsEncoded|$notes|$ts|$prescriptionId';
   }
 
-  void _issuePrescription() {
+  Future<void> _issuePrescription(Map<String, String> userArgs) async {
     final error = _validate();
     if (error != null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error), backgroundColor: kDanger));
       return;
     }
-    _showQrDialog(_buildQrData());
+    final prescriptionId = 'RX-${DateTime.now().millisecondsSinceEpoch}';
+    final doctor = AuthService().currentUser;
+    if (doctor != null) {
+      await AuthService().savePrescription(Prescription(
+        id: prescriptionId,
+        patientId: _patientIdController.text.trim(),
+        doctorId: doctor.nationalId,
+        doctorName: doctor.fullName,
+        medications: _medications
+            .map((m) => PrescriptionMed(
+                  name: m.name.text.trim(),
+                  dosage: m.dosageString,
+                  frequency: m.frequency.text.trim(),
+                ))
+            .toList(),
+        notes: _notesController.text.trim(),
+        issuedAt: DateTime.now(),
+      ));
+    }
+    if (mounted) _showQrDialog(_buildQrData(prescriptionId), userArgs);
   }
 
-  void _showQrDialog(String qrData) {
+  void _showQrDialog(String qrData, Map<String, String> userArgs) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -166,7 +191,8 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
                       onPressed: () {
                         Navigator.pop(ctx);
                         Navigator.pushReplacementNamed(
-                            context, '/doctor-dashboard');
+                            context, '/doctor-dashboard',
+                            arguments: userArgs);
                       },
                       child: const Text('Done'),
                     ),
@@ -193,14 +219,22 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final Map<dynamic, dynamic>? args =
+        ModalRoute.of(context)?.settings.arguments as Map<dynamic, dynamic>?;
+    final String firstName = (args?['firstName'] as String? ?? '').trim().isNotEmpty
+        ? args!['firstName'] as String
+        : AuthService().currentUser?.firstName ?? 'Doctor';
+    final Map<String, String> userArgs = {'firstName': firstName};
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('New Prescription'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () =>
-              Navigator.pushReplacementNamed(context, '/doctor-dashboard'),
+          onPressed: () => Navigator.pushReplacementNamed(
+              context, '/doctor-dashboard',
+              arguments: userArgs),
         ),
       ),
       body: SafeArea(
@@ -277,7 +311,7 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _issuePrescription,
+                  onPressed: () => _issuePrescription(userArgs),
                   icon: const Icon(Icons.qr_code, size: 18),
                   label: const Text('Issue Prescription'),
                 ),
@@ -297,11 +331,11 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (_) => const DoctorPharmacistChat(
-                    firstName: 'Doctor', userRole: 'doctor'),
+                builder: (_) => DoctorPharmacistChat(
+                    firstName: firstName, userRole: 'doctor'),
               );
             case 3:
-              Navigator.pushReplacementNamed(context, '/signin');
+              Navigator.pushReplacementNamed(context, '/profile');
           }
         },
         items: const [
@@ -424,24 +458,61 @@ class _MedicationEntryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // Dosage: amount + unit dropdown
           Row(
             children: [
               Expanded(
+                flex: 3,
                 child: TextField(
-                  controller: entry.dosage,
+                  controller: entry.amount,
+                  keyboardType: TextInputType.number,
                   onChanged: (_) => onChanged(),
                   decoration: const InputDecoration(
-                    hintText: 'Dosage (e.g. 500mg)',
+                    hintText: 'Amount (e.g. 500)',
+                    prefixText: 'Dose: ',
+                    prefixStyle: TextStyle(
+                        color: kTextSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  initialValue: entry.unit,
+                  decoration: const InputDecoration(
+                    labelText: 'Unit',
+                    labelStyle: TextStyle(fontSize: 12),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  ),
+                  items: _units
+                      .map((u) => DropdownMenuItem(
+                          value: u,
+                          child: Text(u,
+                              style: const TextStyle(fontSize: 13))))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      entry.unit = v;
+                      onChanged();
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
                 child: TextField(
                   controller: entry.frequency,
                   onChanged: (_) => onChanged(),
                   decoration: const InputDecoration(
-                    hintText: 'Frequency',
+                    hintText: 'Frequency (e.g. 3× daily)',
                   ),
                 ),
               ),

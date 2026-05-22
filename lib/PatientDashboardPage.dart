@@ -2,8 +2,28 @@ import 'package:flutter/material.dart';
 import 'app_theme.dart';
 import 'auth_service.dart';
 
-class PatientDashboardPage extends StatelessWidget {
+class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
+
+  @override
+  State<PatientDashboardPage> createState() => _PatientDashboardPageState();
+}
+
+class _PatientDashboardPageState extends State<PatientDashboardPage> {
+  List<Prescription> _prescriptions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrescriptions();
+  }
+
+  Future<void> _loadPrescriptions() async {
+    final id = AuthService().currentUser?.nationalId;
+    if (id == null) return;
+    final list = await AuthService().getPrescriptions(id);
+    if (mounted) setState(() => _prescriptions = list);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +41,12 @@ class PatientDashboardPage extends StatelessWidget {
         : hour < 17
             ? 'Good afternoon'
             : 'Good evening';
+
+    final active = _prescriptions.where((p) => !p.isDispensed).toList();
+    final firstMed =
+        active.isNotEmpty && active.first.medications.isNotEmpty
+            ? active.first.medications.first
+            : null;
 
     return Scaffold(
       backgroundColor: kBg,
@@ -125,8 +151,11 @@ class PatientDashboardPage extends StatelessWidget {
                                     style: TextStyle(
                                         color: Colors.white70,
                                         fontSize: 12)),
-                                const Text('Amoxicillin 500mg — 2:00 PM',
-                                    style: TextStyle(
+                                Text(
+                                    firstMed != null
+                                        ? '${firstMed.name} ${firstMed.dosage}'
+                                        : 'No active prescriptions',
+                                    style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14)),
@@ -134,7 +163,9 @@ class PatientDashboardPage extends StatelessWidget {
                             ),
                           ),
                           ElevatedButton(
-                            onPressed: () {},
+                            onPressed: () => Navigator.pushReplacementNamed(
+                                context, '/medication-schedule',
+                                arguments: userArgs),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: kPrimary,
@@ -217,14 +248,45 @@ class PatientDashboardPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    // Recent section
-                    const Text('Active Prescription',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Active Prescriptions',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: kTextPrimary)),
+                        Text('${active.length} active',
+                            style: const TextStyle(
+                                fontSize: 13, color: kTextSecondary)),
+                      ],
+                    ),
                     const SizedBox(height: 12),
-                    _PrescriptionCard(),
+                    if (_prescriptions.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 28),
+                        decoration: BoxDecoration(
+                          color: kCardBg,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: const Column(
+                          children: [
+                            Icon(Icons.receipt_long_outlined,
+                                size: 36, color: Color(0xFFCBD5E1)),
+                            SizedBox(height: 8),
+                            Text('No prescriptions yet.',
+                                style: TextStyle(
+                                    color: kTextSecondary, fontSize: 13)),
+                          ],
+                        ),
+                      )
+                    else
+                      ...active.take(3).map((rx) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _RxCard(rx: rx),
+                          )),
                   ],
                 ),
               ),
@@ -243,7 +305,8 @@ class PatientDashboardPage extends StatelessWidget {
               Navigator.pushReplacementNamed(context, '/pharmacy',
                   arguments: userArgs);
             case 3:
-              Navigator.pushReplacementNamed(context, '/signin');
+              Navigator.pushReplacementNamed(context, '/profile',
+                  arguments: userArgs);
           }
         },
         items: const [
@@ -319,9 +382,20 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-class _PrescriptionCard extends StatelessWidget {
+class _RxCard extends StatelessWidget {
+  final Prescription rx;
+  const _RxCard({required this.rx});
+
   @override
   Widget build(BuildContext context) {
+    final isActive = !rx.isDispensed;
+    final firstMedName = rx.medications.isNotEmpty
+        ? '${rx.medications.first.name} ${rx.medications.first.dosage}'
+        : 'Unknown medication';
+    final subtitle = rx.medications.isNotEmpty
+        ? '${rx.medications.first.frequency} · Dr. ${rx.doctorName.split(' ').last}'
+        : 'Dr. ${rx.doctorName}';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -341,34 +415,36 @@ class _PrescriptionCard extends StatelessWidget {
             child: const Icon(Icons.medication, color: kPrimary, size: 22),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Amoxicillin 500mg',
-                    style: TextStyle(
+                Text(firstMedName,
+                    style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: kTextPrimary,
                         fontSize: 14)),
-                SizedBox(height: 2),
-                Text('3× daily · Post-meal · Dr. Sarah Wilson',
-                    style: TextStyle(
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(
                         fontSize: 12, color: kTextSecondary)),
               ],
             ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: kSuccess.withValues(alpha: 0.1),
+              color: (isActive ? kSuccess : kTextSecondary)
+                  .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text('Active',
-                style: TextStyle(
-                    color: kSuccess,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
+            child: Text(
+              isActive ? 'Active' : 'Dispensed',
+              style: TextStyle(
+                  color: isActive ? kSuccess : kTextSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

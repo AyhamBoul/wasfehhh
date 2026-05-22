@@ -12,6 +12,7 @@ class PatientRecordsPage extends StatefulWidget {
 class _PatientRecordsPageState extends State<PatientRecordsPage> {
   final AuthUser? _user = AuthService().currentUser;
   PatientRecords _records = PatientRecords.empty();
+  List<Prescription> _prescriptions = [];
   bool _loading = true;
 
   @override
@@ -22,10 +23,14 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
 
   Future<void> _loadRecords() async {
     if (_user == null) return;
-    final records = await AuthService().getRecords(_user.nationalId);
+    final results = await Future.wait([
+      AuthService().getRecords(_user.nationalId),
+      AuthService().getPrescriptions(_user.nationalId),
+    ]);
     if (mounted) {
       setState(() {
-        _records = records;
+        _records = results[0] as PatientRecords;
+        _prescriptions = results[1] as List<Prescription>;
         _loading = false;
       });
     }
@@ -251,66 +256,104 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
                             color: kSuccess.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text('1 active',
-                              style: TextStyle(
+                          child: Text(
+                              '${_prescriptions.where((p) => !p.isDispensed).length} active',
+                              style: const TextStyle(
                                   color: kSuccess,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600)),
                         ),
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: kBg,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: kPrimaryLight,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.medication,
-                                    color: kPrimary, size: 20),
+                        child: _prescriptions.isEmpty
+                            ? _emptyHint('No prescriptions on record.')
+                            : Column(
+                                children: _prescriptions
+                                    .map((rx) => Padding(
+                                          padding: const EdgeInsets.only(
+                                              bottom: 8),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: kBg,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 36,
+                                                  height: 36,
+                                                  decoration: BoxDecoration(
+                                                    color: kPrimaryLight,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                  child: const Icon(
+                                                      Icons.medication,
+                                                      color: kPrimary,
+                                                      size: 18),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        rx.medications
+                                                                .isNotEmpty
+                                                            ? '${rx.medications.first.name} ${rx.medications.first.dosage}'
+                                                            : 'Prescription',
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: kTextPrimary,
+                                                            fontSize: 13),
+                                                      ),
+                                                      Text(
+                                                        'Dr. ${rx.doctorName}',
+                                                        style: const TextStyle(
+                                                            fontSize: 11,
+                                                            color:
+                                                                kTextSecondary),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: (rx.isDispensed
+                                                            ? kTextSecondary
+                                                            : kSuccess)
+                                                        .withValues(alpha: 0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                  child: Text(
+                                                    rx.isDispensed
+                                                        ? 'Dispensed'
+                                                        : 'Active',
+                                                    style: TextStyle(
+                                                        color: rx.isDispensed
+                                                            ? kTextSecondary
+                                                            : kSuccess,
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
                               ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Amoxicillin 500mg',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: kTextPrimary,
-                                            fontSize: 13)),
-                                    SizedBox(height: 2),
-                                    Text(
-                                        '3× daily · Post-meal · Dr. Sarah Wilson',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color: kTextSecondary)),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: kSuccess.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text('Active',
-                                    style: TextStyle(
-                                        color: kSuccess,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600)),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -329,7 +372,8 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
               Navigator.pushReplacementNamed(context, '/pharmacy',
                   arguments: userArgs);
             case 3:
-              Navigator.pushReplacementNamed(context, '/signin');
+              Navigator.pushReplacementNamed(context, '/profile',
+                  arguments: userArgs);
           }
         },
         items: const [

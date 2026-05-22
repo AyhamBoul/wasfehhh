@@ -1,18 +1,64 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
+import 'auth_service.dart';
 import 'doctor_pharmacist_chat.dart';
 
-class DoctorDashboardPage extends StatelessWidget {
+class DoctorDashboardPage extends StatefulWidget {
   const DoctorDashboardPage({super.key});
+
+  @override
+  State<DoctorDashboardPage> createState() => _DoctorDashboardPageState();
+}
+
+class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
+  List<Prescription> _issued = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrescriptions();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (ModalRoute.of(context)?.isCurrent == true) {
+      _loadPrescriptions();
+    }
+  }
+
+  Future<void> _loadPrescriptions() async {
+    final id = AuthService().currentUser?.nationalId;
+    if (id == null) return;
+    final list = await AuthService().getDoctorPrescriptions(id);
+    if (mounted) setState(() => _issued = list);
+  }
+
+  String _fmtDate(DateTime dt) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  String _resolveFirstName(Map<dynamic, dynamic>? args) {
+    final fromArgs = (args?['firstName'] as String? ?? '').trim();
+    final raw = fromArgs.isNotEmpty
+        ? fromArgs
+        : AuthService().currentUser?.fullName ?? 'Doctor';
+    // Strip honorary prefix so the header "Good morning, Dr. / <name>" reads correctly.
+    final parts = raw.trim().split(RegExp(r'\s+'));
+    if (parts.length > 1 &&
+        (parts.first.toLowerCase() == 'dr.' ||
+            parts.first.toLowerCase() == 'dr')) {
+      return parts.skip(1).join(' ');
+    }
+    return parts.first.isEmpty ? 'Doctor' : parts.first;
+  }
 
   @override
   Widget build(BuildContext context) {
     final Map<dynamic, dynamic>? args =
         ModalRoute.of(context)?.settings.arguments as Map<dynamic, dynamic>?;
-    final String firstName =
-        (args?['firstName'] as String? ?? '').trim().isNotEmpty
-            ? args!['firstName'] as String
-            : 'Doctor';
+    final String firstName = _resolveFirstName(args);
     final Map<String, String> userArgs = {'firstName': firstName};
 
     final hour = DateTime.now().hour;
@@ -77,7 +123,7 @@ class DoctorDashboardPage extends StatelessWidget {
                     const SizedBox(height: 20),
                     // New prescription CTA
                     GestureDetector(
-                      onTap: () => Navigator.pushNamed(
+                      onTap: () => Navigator.pushReplacementNamed(
                           context, '/new-prescription',
                           arguments: userArgs),
                       child: Container(
@@ -177,16 +223,85 @@ class DoctorDashboardPage extends StatelessWidget {
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                                 color: kTextPrimary)),
-                        Text('0 total',
-                            style: TextStyle(
+                        Text('${_issued.length} total',
+                            style: const TextStyle(
                                 fontSize: 13, color: kTextSecondary)),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _EmptyState(
-                      icon: Icons.receipt_long_outlined,
-                      message: 'No recent prescriptions issued yet.',
-                    ),
+                    if (_issued.isEmpty)
+                      _EmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        message: 'No recent prescriptions issued yet.',
+                      )
+                    else
+                      ..._issued.reversed.take(5).map((rx) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: kCardBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: kBorder),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryLight,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.medication,
+                                        color: kPrimary, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Patient: ${rx.patientId}',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              color: kTextPrimary),
+                                        ),
+                                        Text(
+                                          '${rx.medications.length} medication(s) · ${_fmtDate(rx.issuedAt)}',
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              color: kTextSecondary),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: (rx.isDispensed
+                                              ? kTextSecondary
+                                              : kSuccess)
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      rx.isDispensed ? 'Dispensed' : 'Pending',
+                                      style: TextStyle(
+                                          color: rx.isDispensed
+                                              ? kTextSecondary
+                                              : kSuccess,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )),
                   ],
                 ),
               ),
@@ -210,7 +325,8 @@ class DoctorDashboardPage extends StatelessWidget {
                     firstName: firstName, userRole: 'doctor'),
               );
             case 3:
-              Navigator.pushReplacementNamed(context, '/signin');
+              Navigator.pushReplacementNamed(context, '/profile',
+                  arguments: userArgs);
           }
         },
         items: const [
