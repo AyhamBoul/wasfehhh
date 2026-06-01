@@ -3,6 +3,7 @@ import 'app_theme.dart';
 import 'createaccount.dart';
 import 'profile_page.dart';
 import 'signin.dart';
+import 'splash_page.dart';
 import 'PatientDashboardPage.dart';
 import 'DoctorDashboardPage .dart';
 import 'Pharmacist.dart';
@@ -29,9 +30,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Wasfeh',
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       home: const SignInPage(),
       routes: {
+        '/splash': (context) => const SplashPage(),
         '/create-account': (context) => const CreateAccountPage(),
         '/signin': (context) => const SignInPage(),
         '/patient-dashboard': (context) => const PatientDashboardPage(),

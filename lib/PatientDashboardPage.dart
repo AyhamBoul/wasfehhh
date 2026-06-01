@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
 import 'app_theme.dart';
 import 'auth_service.dart';
 
@@ -11,18 +14,36 @@ class PatientDashboardPage extends StatefulWidget {
 
 class _PatientDashboardPageState extends State<PatientDashboardPage> {
   List<Prescription> _prescriptions = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPrescriptions();
+    _loadDashboard();
   }
 
-  Future<void> _loadPrescriptions() async {
+  Future<void> _loadDashboard() async {
     final id = AuthService().currentUser?.nationalId;
     if (id == null) return;
     final list = await AuthService().getPrescriptions(id);
-    if (mounted) setState(() => _prescriptions = list);
+    if (mounted) {
+      setState(() {
+        _prescriptions = list;
+        _loading = false;
+      });
+    }
+  }
+
+  void _signOut() {
+    AuthService().signOut();
+    Navigator.pushReplacementNamed(context, '/signin');
+  }
+
+  String get greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
   @override
@@ -33,14 +54,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         (args?['firstName'] as String? ?? '').trim().isNotEmpty
             ? args!['firstName'] as String
             : AuthService().currentUser?.firstName ?? 'there';
-    final Map<String, String> userArgs = {'firstName': firstName};
-
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Good morning'
-        : hour < 17
-            ? 'Good afternoon'
-            : 'Good evening';
+    final userArgs = {'firstName': firstName};
 
     final active = _prescriptions.where((p) => !p.isDispensed).toList();
     final firstMed =
@@ -50,282 +64,434 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
 
     return Scaffold(
       backgroundColor: kBg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header ──
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
-                decoration: const BoxDecoration(
-                  gradient: kGradient,
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(28),
-                    bottomRight: Radius.circular(28),
-                  ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          : Stack(
+              children: [
+                Positioned(
+                    top: -120, right: -90, child: _blurCircle(260, kPrimary)),
+                Positioned(
+                  top: 260,
+                  left: -110,
+                  child: _blurCircle(240, const Color(0xFF38BDF8)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$greeting,',
-                              style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                  fontSize: 14),
+                SafeArea(
+                  child: RefreshIndicator(
+                    onRefresh: _loadDashboard,
+                    color: kPrimary,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(22),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _header(firstName),
+                          const SizedBox(height: 24),
+                          _nextDoseCard(firstMed, userArgs),
+                          const SizedBox(height: 26),
+                          const Text(
+                            'Quick Actions',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: kTextPrimary,
                             ),
-                            Text(
-                              firstName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.5,
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              _ActionCard(
+                                icon: Icons.folder_copy_rounded,
+                                label: 'My Records',
+                                subtitle: 'Health files',
+                                color: const Color(0xFF6366F1),
+                                onTap: () => Navigator.pushNamed(
+                                    context, '/patient-records',
+                                    arguments: userArgs),
                               ),
-                            ),
-                          ],
-                        ),
-                        Stack(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
+                              const SizedBox(width: 14),
+                              _ActionCard(
+                                icon: Icons.calendar_month_rounded,
+                                label: 'Calendar',
+                                subtitle: 'Medication plan',
+                                color: kSuccess,
+                                onTap: () => Navigator.pushNamed(
+                                    context, '/medication-schedule',
+                                    arguments: userArgs),
                               ),
-                              child: const Icon(Icons.notifications_outlined,
-                                  color: Colors.white, size: 22),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: kWarning,
-                                  shape: BoxShape.circle,
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              _ActionCard(
+                                icon: Icons.local_pharmacy_rounded,
+                                label: 'Pharmacy',
+                                subtitle: 'Nearby places',
+                                color: kWarning,
+                                onTap: () => Navigator.pushNamed(
+                                    context, '/pharmacy',
+                                    arguments: userArgs),
+                              ),
+                              const SizedBox(width: 14),
+                              _ActionCard(
+                                icon: Icons.qr_code_scanner_rounded,
+                                label: 'Scanner',
+                                subtitle: 'Prescription scan',
+                                color: const Color(0xFFEC4899),
+                                onTap: () => Navigator.pushNamed(
+                                    context, '/prescription-scanner',
+                                    arguments: userArgs),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Active Prescriptions',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: kTextPrimary,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Next dose card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.medication_outlined,
-                                color: Colors.white, size: 22),
+                              Text('${active.length} active',
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: kTextSecondary,
+                                      fontWeight: FontWeight.w600)),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Next Dose',
-                                    style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12)),
-                                Text(
-                                    firstMed != null
-                                        ? '${firstMed.name} ${firstMed.dosage}'
-                                        : 'No active prescriptions',
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pushReplacementNamed(
-                                context, '/medication-schedule',
-                                arguments: userArgs),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: kPrimary,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              minimumSize: Size.zero,
-                              textStyle: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('Mark taken'),
-                          ),
+                          const SizedBox(height: 14),
+                          if (active.isEmpty)
+                            _emptyPrescriptionCard()
+                          else
+                            ...active.take(3).map(_prescriptionCard),
+                          const SizedBox(height: 90),
                         ],
                       ),
                     ),
-                  ],
+                  ),
+                ),
+              ],
+            ),
+      bottomNavigationBar: _loading
+          ? null
+          : _ModernBottomBar(
+              onHome: () {},
+              onCalendar: () => Navigator.pushReplacementNamed(
+                  context, '/medication-schedule',
+                  arguments: userArgs),
+              onPharmacy: () => Navigator.pushReplacementNamed(
+                  context, '/pharmacy', arguments: userArgs),
+              onSignOut: _signOut,
+            ),
+    );
+  }
+
+  Widget _header(String firstName) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: kGradient,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: kPrimary.withValues(alpha: 0.25),
+                blurRadius: 28,
+                offset: const Offset(0, 14),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    height: 52,
+                    width: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(Icons.health_and_safety_rounded,
+                        color: Colors.white, size: 30),
+                  ),
+                  Row(
+                    children: [
+                      _headerIcon(Icons.notifications_none_rounded),
+                      const SizedBox(width: 10),
+                      GestureDetector(
+                        onTap: _signOut,
+                        child: _headerIcon(Icons.logout_rounded),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 26),
+              Text(
+                '$greeting,',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Quick Actions',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary)),
-                    const SizedBox(height: 14),
-
-                    // 2×2 grid
-                    Row(
-                      children: [
-                        _ActionCard(
-                          icon: Icons.article_outlined,
-                          label: 'My Records',
-                          color: const Color(0xFF6366F1),
-                          onTap: () => Navigator.pushNamed(
-                              context, '/patient-records',
-                              arguments: userArgs),
-                        ),
-                        const SizedBox(width: 12),
-                        _ActionCard(
-                          icon: Icons.calendar_month_outlined,
-                          label: 'Medication Calendar',
-                          color: kSuccess,
-                          onTap: () => Navigator.pushNamed(
-                              context, '/medication-schedule',
-                              arguments: userArgs),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _ActionCard(
-                          icon: Icons.local_pharmacy_outlined,
-                          label: 'Pharmacy Map',
-                          color: kWarning,
-                          onTap: () => Navigator.pushNamed(
-                              context, '/pharmacy',
-                              arguments: userArgs),
-                        ),
-                        const SizedBox(width: 12),
-                        _ActionCard(
-                          icon: Icons.connect_without_contact_outlined,
-                          label: 'Doctor Connect',
-                          color: const Color(0xFFEC4899),
-                          onTap: () =>
-                              ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content:
-                                    Text('Doctor Connect coming soon.')),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Active Prescriptions',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: kTextPrimary)),
-                        Text('${active.length} active',
-                            style: const TextStyle(
-                                fontSize: 13, color: kTextSecondary)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (_prescriptions.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 28),
-                        decoration: BoxDecoration(
-                          color: kCardBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: kBorder),
-                        ),
-                        child: const Column(
-                          children: [
-                            Icon(Icons.receipt_long_outlined,
-                                size: 36, color: Color(0xFFCBD5E1)),
-                            SizedBox(height: 8),
-                            Text('No prescriptions yet.',
-                                style: TextStyle(
-                                    color: kTextSecondary, fontSize: 13)),
-                          ],
-                        ),
-                      )
-                    else
-                      ...active.take(3).map((rx) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _RxCard(rx: rx),
-                          )),
-                  ],
+              const SizedBox(height: 4),
+              Text(
+                firstName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1,
                 ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Here is your health overview.',
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.82), fontSize: 14),
               ),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        onTap: (i) {
-          switch (i) {
-            case 1:
-              Navigator.pushReplacementNamed(context, '/medication-schedule',
-                  arguments: userArgs);
-            case 2:
-              Navigator.pushReplacementNamed(context, '/pharmacy',
-                  arguments: userArgs);
-            case 3:
-              Navigator.pushReplacementNamed(context, '/profile',
-                  arguments: userArgs);
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: 'Calendar'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.local_pharmacy_outlined),
-              activeIcon: Icon(Icons.local_pharmacy),
-              label: 'Pharmacy'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.account_circle_outlined),
-              activeIcon: Icon(Icons.account_circle),
-              label: 'Profile'),
+    );
+  }
+
+  Widget _headerIcon(IconData icon) {
+    return Container(
+      height: 44,
+      width: 44,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Icon(icon, color: Colors.white, size: 22),
+    );
+  }
+
+  Widget _nextDoseCard(PrescriptionMed? firstMed, Map<String, String> userArgs) {
+    return _InfoCard(
+      icon: Icons.medication_liquid_rounded,
+      title: 'Next Dose',
+      subtitle: firstMed != null
+          ? '${firstMed.name} ${firstMed.dosage}'
+          : 'No active prescriptions',
+      buttonText: 'Calendar',
+      onPressed: () => Navigator.pushNamed(context, '/medication-schedule',
+          arguments: userArgs),
+    );
+  }
+
+  Widget _prescriptionCard(Prescription rx) {
+    final firstMed =
+        rx.medications.isNotEmpty ? rx.medications.first : null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.045),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 56,
+            width: 56,
+            decoration: BoxDecoration(
+              gradient: kGradient,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.medication_rounded,
+                color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: firstMed == null
+                ? const Text('Prescription has no medications',
+                    style: TextStyle(color: kTextSecondary))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        firstMed.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: kTextPrimary,
+                            fontSize: 15),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${firstMed.dosage} · ${firstMed.frequency}',
+                        style: const TextStyle(
+                            fontSize: 12, color: kTextSecondary),
+                      ),
+                      Text(
+                        'Dr. ${rx.doctorName} · ${rx.medications.length} med(s)',
+                        style: const TextStyle(
+                            fontSize: 12, color: kTextSecondary),
+                      ),
+                    ],
+                  ),
+          ),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: (rx.isDispensed ? kTextSecondary : kSuccess)
+                  .withValues(alpha: 0.11),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              rx.isDispensed ? 'Dispensed' : 'Active',
+              style: TextStyle(
+                color: rx.isDispensed ? kTextSecondary : kSuccess,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyPrescriptionCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 18),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: kBorder),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.receipt_long_rounded,
+              size: 44, color: Color(0xFFCBD5E1)),
+          SizedBox(height: 12),
+          Text(
+            'No active prescriptions',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: kTextPrimary),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Prescriptions created by your doctor will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: kTextSecondary, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _blurCircle(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.14),
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String buttonText;
+  final VoidCallback onPressed;
+
+  const _InfoCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.buttonText,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 26,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            height: 54,
+            width: 54,
+            decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, color: kPrimary, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: kTextSecondary,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        color: kTextPrimary,
+                        fontWeight: FontWeight.w900)),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: onPressed,
+            style: ElevatedButton.styleFrom(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              minimumSize: Size.zero,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+            child: Text(buttonText, style: const TextStyle(fontSize: 12)),
+          ),
         ],
       ),
     );
@@ -335,14 +501,17 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
 class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
-  const _ActionCard(
-      {required this.icon,
-      required this.label,
-      required this.color,
-      required this.onTap});
+  const _ActionCard({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -350,30 +519,44 @@ class _ActionCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(16),
+          height: 145,
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: kCardBg,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(26),
             border: Border.all(color: kBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.045),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                height: 48,
+                width: 48,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(17),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 26),
               ),
-              const SizedBox(height: 12),
+              const Spacer(),
               Text(label,
                   style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
                       color: kTextPrimary)),
+              const SizedBox(height: 3),
+              Text(subtitle,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: kTextSecondary,
+                      fontWeight: FontWeight.w500)),
             ],
           ),
         ),
@@ -382,71 +565,98 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-class _RxCard extends StatelessWidget {
-  final Prescription rx;
-  const _RxCard({required this.rx});
+class _ModernBottomBar extends StatelessWidget {
+  final VoidCallback onHome;
+  final VoidCallback onCalendar;
+  final VoidCallback onPharmacy;
+  final VoidCallback onSignOut;
+
+  const _ModernBottomBar({
+    required this.onHome,
+    required this.onCalendar,
+    required this.onPharmacy,
+    required this.onSignOut,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isActive = !rx.isDispensed;
-    final firstMedName = rx.medications.isNotEmpty
-        ? '${rx.medications.first.name} ${rx.medications.first.dosage}'
-        : 'Unknown medication';
-    final subtitle = rx.medications.isNotEmpty
-        ? '${rx.medications.first.frequency} · Dr. ${rx.doctorName.split(' ').last}'
-        : 'Dr. ${rx.doctorName}';
-
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorder),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: kPrimaryLight,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.medication, color: kPrimary, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(firstMedName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: kTextPrimary,
-                        fontSize: 14)),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: const TextStyle(
-                        fontSize: 12, color: kTextSecondary)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: (isActive ? kSuccess : kTextSecondary)
-                  .withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              isActive ? 'Active' : 'Dispensed',
-              style: TextStyle(
-                  color: isActive ? kSuccess : kTextSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600),
-            ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
           ),
         ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _NavItem(
+              icon: Icons.home_rounded,
+              label: 'Home',
+              active: true,
+              onTap: onHome),
+          _NavItem(
+              icon: Icons.calendar_month_rounded,
+              label: 'Calendar',
+              onTap: onCalendar),
+          _NavItem(
+              icon: Icons.local_pharmacy_rounded,
+              label: 'Pharmacy',
+              onTap: onPharmacy),
+          _NavItem(
+              icon: Icons.logout_rounded, label: 'Logout', onTap: onSignOut),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? kPrimaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: active ? kPrimary : kTextSecondary, size: 23),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: active ? kPrimary : kTextSecondary,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w900 : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

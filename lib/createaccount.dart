@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
 import 'app_theme.dart';
 import 'auth_service.dart';
 
@@ -6,17 +9,18 @@ class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
 
   @override
-  _CreateAccountPageState createState() => _CreateAccountPageState();
+  State<CreateAccountPage> createState() => _CreateAccountPageState();
 }
 
 class _CreateAccountPageState extends State<CreateAccountPage> {
-  String selectedRole = 'Patient';
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController fullNameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController nationalIdController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController licenseController = TextEditingController();
+
+  String selectedRole = 'Patient';
   bool _isLoading = false;
   bool _obscure = true;
 
@@ -41,11 +45,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     }
   }
 
-  String _extractFirstName(String fullName) {
-    final parts = fullName.trim().split(RegExp(r'\s+'));
-    return parts.isEmpty || parts.first.isEmpty ? 'User' : parts.first;
-  }
-
   Future<void> _createAccount() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
@@ -54,13 +53,13 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     if (needsLicense && licenseController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('License number is required for this role.'),
-            backgroundColor: kDanger),
+          content: Text('License number is required for this role.'),
+          backgroundColor: kDanger,
+        ),
       );
       setState(() => _isLoading = false);
       return;
     }
-
     final error = await AuthService().register(
       nationalId: nationalIdController.text.trim(),
       password: passwordController.text,
@@ -72,340 +71,337 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error), backgroundColor: kDanger));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: kDanger),
+      );
       return;
     }
     Navigator.pushReplacementNamed(
       context,
       _routeForRole(selectedRole),
-      arguments: {
-        'firstName': _extractFirstName(fullNameController.text.trim()),
-      },
+      arguments: {'firstName': AuthService().currentUser?.firstName ?? ''},
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final needsLicense =
+        selectedRole == 'Doctor' || selectedRole == 'Pharmacist';
+
     return Scaffold(
       backgroundColor: kBg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // ── Gradient header ──
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
-                decoration: const BoxDecoration(
-                  gradient: kGradient,
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(32),
-                    bottomRight: Radius.circular(32),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        final popped = await Navigator.maybePop(context);
-                        if (!popped && context.mounted) {
-                          Navigator.pushReplacementNamed(context, '/signin');
-                        }
-                      },
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new,
-                            color: Colors.white, size: 16),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(
-                        Icons.health_and_safety_rounded,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Create account',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Join the Wasfeh health ecosystem',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
+        children: [
+          Positioned(top: -120, right: -80, child: _blurCircle(240, kPrimary)),
+          Positioned(
+            top: 180,
+            left: -90,
+            child: _blurCircle(220, const Color(0xFF38BDF8)),
+          ),
+          SafeArea(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 18),
+                  Row(
                     children: [
-                      const SizedBox(height: 8),
-
-                      // Role selector
-                      const Text(
-                        'I am a',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: ['Patient', 'Doctor', 'Pharmacist'].map((r) {
-                          final selected = selectedRole == r;
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => selectedRole = r),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                margin: const EdgeInsets.only(right: 8),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selected ? kPrimary : kCardBg,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: selected ? kPrimary : kBorder,
-                                    width: selected ? 2 : 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      r == 'Patient'
-                                          ? Icons.person_outline
-                                          : r == 'Doctor'
-                                          ? Icons.medical_services_outlined
-                                          : Icons.local_pharmacy_outlined,
-                                      color: selected
-                                          ? Colors.white
-                                          : kTextSecondary,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      r,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: selected
-                                            ? Colors.white
-                                            : kTextSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                      Container(
+                        height: 54,
+                        width: 54,
+                        decoration: BoxDecoration(
+                          gradient: kGradient,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kPrimary.withValues(alpha: 0.25),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
                             ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 20),
-
-                      _fieldLabel('Full Name'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: fullNameController,
-                        textCapitalization: TextCapitalization.words,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Full name is required'
-                            : null,
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. Ahmad Nasser',
-                          prefixIcon: Icon(
-                            Icons.person_outline,
-                            color: kTextSecondary,
-                            size: 20,
-                          ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.health_and_safety_rounded,
+                          color: Colors.white,
+                          size: 30,
                         ),
                       ),
-                      const SizedBox(height: 14),
-
-                      _fieldLabel('Email Address'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) {
-                          final e = v?.trim() ?? '';
-                          if (e.isEmpty) return 'Email is required';
-                          if (!e.contains('@')) return "Enter a valid email";
-                          return null;
-                        },
-                        decoration: const InputDecoration(
-                          hintText: 'you@example.com',
-                          prefixIcon: Icon(
-                            Icons.email_outlined,
-                            color: kTextSecondary,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      _fieldLabel('National ID'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: nationalIdController,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'National ID is required'
-                            : null,
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. PAT-001',
-                          prefixIcon: Icon(
-                            Icons.badge_outlined,
-                            color: kTextSecondary,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // License number — only for Doctor / Pharmacist
-                      if (selectedRole == 'Doctor' ||
-                          selectedRole == 'Pharmacist') ...[
-                        _fieldLabel(selectedRole == 'Doctor'
-                            ? 'Medical License Number'
-                            : 'Pharmacy License Number'),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: licenseController,
-                          decoration: InputDecoration(
-                            hintText: selectedRole == 'Doctor'
-                                ? 'e.g. LIC-DR-2024-001'
-                                : 'e.g. LIC-PH-2024-001',
-                            prefixIcon: const Icon(Icons.verified_outlined,
-                                color: kTextSecondary, size: 20),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-
-                      _fieldLabel('Password'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: passwordController,
-                        obscureText: _obscure,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Password is required'
-                            : null,
-                        decoration: InputDecoration(
-                          hintText: '••••••••',
-                          prefixIcon: const Icon(
-                            Icons.lock_outline,
-                            color: kTextSecondary,
-                            size: 20,
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscure
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              color: kTextSecondary,
-                              size: 20,
-                            ),
-                            onPressed: () =>
-                                setState(() => _obscure = !_obscure),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _createAccount,
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Create Account'),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      const SizedBox(width: 14),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Already have an account?',
+                          Text(
+                            'Wasfeh',
                             style: TextStyle(
-                              color: kTextSecondary,
-                              fontSize: 14,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: kTextPrimary,
                             ),
                           ),
-                          TextButton(
-                            onPressed: () => Navigator.pushReplacementNamed(
-                              context,
-                              '/signin',
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: kPrimary,
-                              padding: const EdgeInsets.only(left: 4),
-                            ),
-                            child: const Text(
-                              'Sign In',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
+                          Text(
+                            'Smart healthcare platform',
+                            style: TextStyle(
+                                fontSize: 13, color: kTextSecondary),
                           ),
                         ],
                       ),
-                      Center(
-                        child: TextButton(
-                          onPressed: () => Navigator.pushReplacementNamed(
-                            context,
-                            '/guest-home',
+                    ],
+                  ),
+                  const SizedBox(height: 34),
+                  const Text(
+                    'Create your\naccount',
+                    style: TextStyle(
+                      fontSize: 42,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900,
+                      color: kTextPrimary,
+                      letterSpacing: -1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Choose your role and join the secure healthcare ecosystem.',
+                    style: TextStyle(
+                        fontSize: 15, height: 1.5, color: kTextSecondary),
+                  ),
+                  const SizedBox(height: 28),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.86),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.9),
                           ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: kTextSecondary,
-                          ),
-                          child: const Text(
-                            'Continue as Guest',
-                            style: TextStyle(fontSize: 13),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.07),
+                              blurRadius: 32,
+                              offset: const Offset(0, 18),
+                            ),
+                          ],
+                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Select your role',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: kTextPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  _roleCard('Patient', Icons.person_rounded),
+                                  _roleCard('Doctor',
+                                      Icons.medical_services_rounded),
+                                  _roleCard('Pharmacist',
+                                      Icons.local_pharmacy_rounded),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+                              _input(
+                                label: 'Full Name',
+                                controller: fullNameController,
+                                icon: Icons.person_outline_rounded,
+                                hint: 'Ahmad Nasser',
+                                validator: (v) => (v?.trim().isEmpty ?? true)
+                                    ? 'Full name is required'
+                                    : null,
+                              ),
+                              const SizedBox(height: 16),
+                              _input(
+                                label: 'Email Address',
+                                controller: emailController,
+                                icon: Icons.email_outlined,
+                                hint: 'example@email.com',
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) {
+                                  final e = v?.trim() ?? '';
+                                  if (e.isEmpty) return 'Email is required';
+                                  if (!e.contains('@')) {
+                                    return 'Invalid email';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              _input(
+                                label: 'National ID',
+                                controller: nationalIdController,
+                                icon: Icons.badge_outlined,
+                                hint: 'e.g. PAT-001',
+                                validator: (v) => (v?.trim().isEmpty ?? true)
+                                    ? 'National ID is required'
+                                    : null,
+                              ),
+                              const SizedBox(height: 16),
+                              _input(
+                                label: 'Password',
+                                controller: passwordController,
+                                icon: Icons.lock_outline_rounded,
+                                hint: '••••••••',
+                                obscureText: _obscure,
+                                suffixIcon: IconButton(
+                                  onPressed: () =>
+                                      setState(() => _obscure = !_obscure),
+                                  icon: Icon(
+                                    _obscure
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: kTextSecondary,
+                                  ),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Password is required';
+                                  }
+                                  if (v.length < 6) {
+                                    return 'Minimum 6 characters';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              if (needsLicense) ...[
+                                const SizedBox(height: 16),
+                                _input(
+                                  label: 'License Number',
+                                  controller: licenseController,
+                                  icon: Icons.verified_outlined,
+                                  hint: 'e.g. LIC-DR-2024-001',
+                                  validator: (v) =>
+                                      (v?.trim().isEmpty ?? true)
+                                          ? 'License number is required'
+                                          : null,
+                                ),
+                              ],
+                              const SizedBox(height: 26),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  onPressed:
+                                      _isLoading ? null : _createAccount,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kPrimary,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Create Account',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'Already have an account?',
+                                    style: TextStyle(
+                                        color: kTextSecondary, fontSize: 14),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pushReplacementNamed(
+                                            context, '/signin'),
+                                    child: const Text(
+                                      'Sign In',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Center(
+                                child: TextButton(
+                                  onPressed: () =>
+                                      Navigator.pushReplacementNamed(
+                                          context, '/guest-home'),
+                                  child: const Text(
+                                    'Continue as Guest',
+                                    style: TextStyle(color: kTextSecondary),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
+                  const SizedBox(height: 28),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _roleCard(String title, IconData icon) {
+    final isSelected = selectedRole == title;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => selectedRole = title),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            gradient: isSelected ? kGradient : null,
+            color: isSelected ? null : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected ? Colors.transparent : kBorder,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: kPrimary.withValues(alpha: 0.22),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Column(
+            children: [
+              Icon(icon,
+                  color: isSelected ? Colors.white : kTextSecondary, size: 26),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? Colors.white : kTextSecondary,
                 ),
               ),
             ],
@@ -414,14 +410,49 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       ),
     );
   }
-}
 
-Widget _fieldLabel(String text) => Text(
-  text,
-  style: const TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    color: kTextPrimary,
-    letterSpacing: 0.2,
-  ),
-);
+  Widget _input({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    required String hint,
+    required String? Function(String?) validator,
+    TextInputType keyboardType = TextInputType.text,
+    bool obscureText = false,
+    Widget? suffixIcon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: kTextPrimary)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon, color: kTextSecondary),
+            suffixIcon: suffixIcon,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _blurCircle(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withValues(alpha: 0.16),
+      ),
+    );
+  }
+}
