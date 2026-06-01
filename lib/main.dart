@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
       title: 'Wasfeh',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      home: const SignInPage(),
+      home: const SplashPage(),
       routes: {
         '/splash': (context) => const SplashPage(),
         '/create-account': (context) => const CreateAccountPage(),

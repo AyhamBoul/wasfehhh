@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_theme.dart';
 import 'auth_service.dart';
@@ -37,6 +39,129 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   void _signOut() {
     AuthService().signOut();
     Navigator.pushReplacementNamed(context, '/signin');
+  }
+
+  void _showNotifications() {
+    final active = _prescriptions.where((p) => !p.isDispensed).toList();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: const BoxDecoration(
+          color: kBg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Notifications',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: kTextPrimary)),
+            const SizedBox(height: 14),
+            if (active.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No active prescriptions.',
+                    style: TextStyle(color: kTextSecondary)),
+              )
+            else
+              ...active.expand((rx) => rx.medications.map((med) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: kPrimaryLight,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.medication_rounded,
+                              color: kPrimary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${med.name} ${med.dosage}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: kTextPrimary)),
+                              Text(med.frequency,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: kTextSecondary)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Returns the earliest time slot (hour, minute) for a frequency string.
+  (int, int) _firstSlot(String frequency) {
+    final lower = frequency.toLowerCase();
+    if (lower.contains('night') ||
+        lower.contains('sleep') ||
+        lower.contains('bedtime') ||
+        lower.contains('hs')) {
+      return (21, 0);
+    }
+    return (8, 0);
+  }
+
+  Future<void> _markNextDoseTaken(
+      Prescription rx, PrescriptionMed med, Map<String, String> userArgs) async {
+    final userId = AuthService().currentUser?.nationalId ?? 'guest';
+    final now = DateTime.now();
+    final dateKey =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final storageKey = 'qm_taken_${userId}_$dateKey';
+    final slot = _firstSlot(med.frequency);
+    final takenKey = '${rx.id}:${med.name}:${slot.$1}:${slot.$2}';
+
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(storageKey);
+    Set<String> taken = {};
+    if (raw != null) {
+      try {
+        taken = (jsonDecode(raw) as List<dynamic>).whereType<String>().toSet();
+      } catch (_) {}
+    }
+    taken.add(takenKey);
+    await prefs.setString(storageKey, jsonEncode(taken.toList()));
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${med.name} marked as taken.'),
+        backgroundColor: kSuccess,
+      ),
+    );
+    Navigator.pushReplacementNamed(context, '/medication-schedule',
+        arguments: userArgs);
   }
 
   String get greeting {
@@ -87,7 +212,10 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                         children: [
                           _header(firstName),
                           const SizedBox(height: 24),
-                          _nextDoseCard(firstMed, userArgs),
+                          _nextDoseCard(
+                              active.isNotEmpty ? active.first : null,
+                              firstMed,
+                              userArgs),
                           const SizedBox(height: 26),
                           const Text(
                             'Quick Actions',
@@ -228,7 +356,10 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                   ),
                   Row(
                     children: [
-                      _headerIcon(Icons.notifications_none_rounded),
+                      GestureDetector(
+                        onTap: _showNotifications,
+                        child: _headerIcon(Icons.notifications_none_rounded),
+                      ),
                       const SizedBox(width: 10),
                       GestureDetector(
                         onTap: _signOut,
@@ -282,16 +413,19 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     );
   }
 
-  Widget _nextDoseCard(PrescriptionMed? firstMed, Map<String, String> userArgs) {
+  Widget _nextDoseCard(Prescription? firstRx, PrescriptionMed? firstMed,
+      Map<String, String> userArgs) {
     return _InfoCard(
       icon: Icons.medication_liquid_rounded,
       title: 'Next Dose',
       subtitle: firstMed != null
           ? '${firstMed.name} ${firstMed.dosage}'
           : 'No active prescriptions',
-      buttonText: 'Calendar',
-      onPressed: () => Navigator.pushNamed(context, '/medication-schedule',
-          arguments: userArgs),
+      buttonText: firstMed != null ? 'Mark taken' : 'Calendar',
+      onPressed: firstMed != null && firstRx != null
+          ? () => _markNextDoseTaken(firstRx, firstMed, userArgs)
+          : () => Navigator.pushNamed(context, '/medication-schedule',
+              arguments: userArgs),
     );
   }
 

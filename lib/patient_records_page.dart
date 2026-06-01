@@ -358,42 +358,17 @@ class _PatientRecordsPageState extends State<PatientRecordsPage> {
                     ],
                   ),
                 ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        onTap: (i) {
-          switch (i) {
-            case 0:
-              Navigator.pushReplacementNamed(context, '/patient-dashboard',
-                  arguments: userArgs);
-            case 1:
-              Navigator.pushReplacementNamed(context, '/medication-schedule',
-                  arguments: userArgs);
-            case 2:
-              Navigator.pushReplacementNamed(context, '/pharmacy',
-                  arguments: userArgs);
-            case 3:
-              Navigator.pushReplacementNamed(context, '/profile',
-                  arguments: userArgs);
-          }
+      bottomNavigationBar: _PatientNavBar(
+        onHome: () => Navigator.pushReplacementNamed(
+            context, '/patient-dashboard', arguments: userArgs),
+        onCalendar: () => Navigator.pushReplacementNamed(
+            context, '/medication-schedule', arguments: userArgs),
+        onPharmacy: () => Navigator.pushReplacementNamed(
+            context, '/pharmacy', arguments: userArgs),
+        onLogout: () {
+          AuthService().signOut();
+          Navigator.pushReplacementNamed(context, '/signin');
         },
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: 'Calendar'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.local_pharmacy_outlined),
-              activeIcon: Icon(Icons.local_pharmacy),
-              label: 'Pharmacy'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.account_circle_outlined),
-              activeIcon: Icon(Icons.account_circle),
-              label: 'Profile'),
-        ],
       ),
     );
   }
@@ -508,6 +483,86 @@ class _RecordChip extends StatelessWidget {
             child: Icon(Icons.close, size: 13, color: color),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PatientNavBar extends StatelessWidget {
+  final VoidCallback onHome;
+  final VoidCallback onCalendar;
+  final VoidCallback onPharmacy;
+  final VoidCallback onLogout;
+
+  const _PatientNavBar({
+    required this.onHome,
+    required this.onCalendar,
+    required this.onPharmacy,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _NavItem(icon: Icons.home_rounded, label: 'Home', onTap: onHome),
+          _NavItem(
+              icon: Icons.calendar_month_rounded,
+              label: 'Calendar',
+              onTap: onCalendar),
+          _NavItem(
+              icon: Icons.local_pharmacy_rounded,
+              label: 'Pharmacy',
+              onTap: onPharmacy),
+          _NavItem(
+              icon: Icons.logout_rounded, label: 'Logout', onTap: onLogout),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _NavItem(
+      {required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: kTextSecondary, size: 23),
+            const SizedBox(height: 4),
+            Text(label,
+                style: const TextStyle(
+                    color: kTextSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }

@@ -48,6 +48,81 @@ class _PharmacistPortalPageState extends State<PharmacistPortalPage> {
     Navigator.pushReplacementNamed(context, '/signin');
   }
 
+  void _showNotifications() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: const BoxDecoration(
+          color: kBg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                    color: kBorder, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Notifications',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: kTextPrimary)),
+            const SizedBox(height: 14),
+            if (_pending.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No pending refills in your queue.',
+                    style: TextStyle(color: kTextSecondary)),
+              )
+            else
+              ...  _pending.take(5).map((rx) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                              color: kPrimaryLight,
+                              borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.medication_rounded,
+                              color: kPrimary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Patient: ${rx.patientId}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: kTextPrimary)),
+                              Text(
+                                  rx.medications.isNotEmpty
+                                      ? '${rx.medications.first.name} · pending dispensing'
+                                      : 'Pending dispensing',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: kTextSecondary)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _openScanner() async {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
@@ -432,7 +507,10 @@ class _PharmacistPortalPageState extends State<PharmacistPortalPage> {
                   ),
                   Row(
                     children: [
-                      _headerIcon(Icons.notifications_none_rounded),
+                      GestureDetector(
+                        onTap: _showNotifications,
+                        child: _headerIcon(Icons.notifications_none_rounded),
+                      ),
                       const SizedBox(width: 10),
                       GestureDetector(
                         onTap: _signOut,

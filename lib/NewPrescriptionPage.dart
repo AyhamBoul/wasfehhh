@@ -320,42 +320,22 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
-        onTap: (i) {
-          switch (i) {
-            case 0:
-              Navigator.pushReplacementNamed(context, '/doctor-dashboard');
-            case 2:
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => DoctorPharmacistChat(
-                    firstName: firstName, userRole: 'doctor'),
-              );
-            case 3:
-              Navigator.pushReplacementNamed(context, '/profile');
-          }
+      bottomNavigationBar: _DoctorNavBar(
+        activeIndex: 1,
+        onHome: () => Navigator.pushReplacementNamed(
+            context, '/doctor-dashboard', arguments: userArgs),
+        onCreate: () {},
+        onMessages: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) =>
+              DoctorPharmacistChat(firstName: firstName, userRole: 'doctor'),
+        ),
+        onLogout: () {
+          AuthService().signOut();
+          Navigator.pushReplacementNamed(context, '/signin');
         },
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline),
-              activeIcon: Icon(Icons.add_circle),
-              label: 'Create'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
-              label: 'Messages'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.account_circle_outlined),
-              activeIcon: Icon(Icons.account_circle),
-              label: 'Profile'),
-        ],
       ),
     );
   }
@@ -374,6 +354,96 @@ class _SectionLabel extends StatelessWidget {
             color: kTextPrimary,
             letterSpacing: 0.2),
       );
+}
+
+class _DoctorNavBar extends StatelessWidget {
+  final int activeIndex;
+  final VoidCallback onHome;
+  final VoidCallback onCreate;
+  final VoidCallback onMessages;
+  final VoidCallback onLogout;
+
+  const _DoctorNavBar({
+    required this.activeIndex,
+    required this.onHome,
+    required this.onCreate,
+    required this.onMessages,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _DNavItem(icon: Icons.home_rounded, label: 'Home',
+              active: activeIndex == 0, onTap: onHome),
+          _DNavItem(icon: Icons.add_circle_rounded, label: 'Create',
+              active: activeIndex == 1, onTap: onCreate),
+          _DNavItem(icon: Icons.chat_bubble_rounded, label: 'Messages',
+              active: activeIndex == 2, onTap: onMessages),
+          _DNavItem(icon: Icons.logout_rounded, label: 'Logout',
+              onTap: onLogout),
+        ],
+      ),
+    );
+  }
+}
+
+class _DNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _DNavItem({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? kPrimaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: active ? kPrimary : kTextSecondary, size: 23),
+            const SizedBox(height: 4),
+            Text(label,
+                style: TextStyle(
+                    color: active ? kPrimary : kTextSecondary,
+                    fontSize: 11,
+                    fontWeight:
+                        active ? FontWeight.w900 : FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _MedicationEntryCard extends StatelessWidget {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
 import 'auth_service.dart';
+import 'doctor_pharmacist_chat.dart';
+import 'prescription_scanner_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -254,6 +256,22 @@ class ProfilePage extends StatelessWidget {
 
   Widget _buildNav(BuildContext context, AuthUser user,
       Map<String, String> userArgs) {
+    void openChat() => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => DoctorPharmacistChat(
+            firstName: user.firstName,
+            userRole: user.role.toLowerCase(),
+          ),
+        );
+
+    void openScanner() => Navigator.push<Map<String, dynamic>>(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const PrescriptionScannerPage()),
+        );
+
     switch (user.role) {
       case 'Doctor':
         return BottomNavigationBar(
@@ -267,8 +285,7 @@ class ProfilePage extends StatelessWidget {
                 Navigator.pushReplacementNamed(context, '/new-prescription',
                     arguments: userArgs);
               case 2:
-                Navigator.pushReplacementNamed(context, '/doctor-dashboard',
-                    arguments: userArgs);
+                openChat();
             }
           },
           items: const [
@@ -300,13 +317,9 @@ class ProfilePage extends StatelessWidget {
                     context, '/pharmacist-portal',
                     arguments: userArgs);
               case 1:
-                Navigator.pushReplacementNamed(
-                    context, '/pharmacist-portal',
-                    arguments: userArgs);
+                openScanner();
               case 2:
-                Navigator.pushReplacementNamed(
-                    context, '/pharmacist-portal',
-                    arguments: userArgs);
+                openChat();
             }
           },
           items: const [

@@ -70,6 +70,80 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
     Navigator.pushReplacementNamed(context, '/signin');
   }
 
+  void _showNotifications() {
+    final pending = _issued.where((rx) => !rx.isDispensed).toList();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: const BoxDecoration(
+          color: kBg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                    color: kBorder, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Notifications',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: kTextPrimary)),
+            const SizedBox(height: 14),
+            if (pending.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('All prescriptions have been dispensed.',
+                    style: TextStyle(color: kTextSecondary)),
+              )
+            else
+              ...pending.take(5).map((rx) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                              color: kPrimaryLight,
+                              borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.receipt_long_rounded,
+                              color: kPrimary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Patient: ${rx.patientId}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: kTextPrimary)),
+                              Text(
+                                  '${rx.medications.length} med(s) · awaiting dispensing',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: kTextSecondary)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openChat(String firstName) {
     showModalBottomSheet(
       context: context,
@@ -307,7 +381,10 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
                   ),
                   Row(
                     children: [
-                      _headerIcon(Icons.notifications_none_rounded),
+                      GestureDetector(
+                        onTap: _showNotifications,
+                        child: _headerIcon(Icons.notifications_none_rounded),
+                      ),
                       const SizedBox(width: 10),
                       GestureDetector(
                         onTap: _signOut,

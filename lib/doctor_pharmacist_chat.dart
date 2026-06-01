@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_theme.dart';
+import 'auth_service.dart';
 
 class ChatMessage {
   final String sender; // 'doctor' or 'pharmacist'
@@ -47,7 +48,8 @@ class DoctorPharmacistChat extends StatefulWidget {
 }
 
 class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
-  static const _key = 'qm_chat_messages';
+  String get _key =>
+      'qm_chat_${AuthService().currentUser?.nationalId ?? "guest"}';
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -70,29 +72,6 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
           .toList();
     }
-    if (loaded.isEmpty) {
-      loaded = [
-        ChatMessage(
-          sender: 'pharmacist',
-          senderName: 'Pharmacist',
-          text: 'Hello! Any questions about medications or stock?',
-          timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
-        ),
-        ChatMessage(
-          sender: 'doctor',
-          senderName: 'Doctor',
-          text: 'Hi! I need to check availability of Amoxicillin 500mg.',
-          timestamp: DateTime.now().subtract(const Duration(minutes: 8)),
-        ),
-        ChatMessage(
-          sender: 'pharmacist',
-          senderName: 'Pharmacist',
-          text: 'We have sufficient stock. How many units do you need?',
-          timestamp: DateTime.now().subtract(const Duration(minutes: 6)),
-        ),
-      ];
-      await _saveMessages(loaded);
-    }
     if (mounted) {
       setState(() {
         _messages = loaded;
@@ -113,7 +92,7 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
     if (text.isEmpty) return;
     final msg = ChatMessage(
       sender: widget.userRole,
-      senderName: widget.userRole == 'doctor' ? 'Doctor' : 'Pharmacist',
+      senderName: widget.firstName,
       text: text,
       timestamp: DateTime.now(),
     );
