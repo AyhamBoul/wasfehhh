@@ -133,6 +133,39 @@ class Prescription {
       );
 }
 
+class PatientMessage {
+  final String doctorId;
+  final String doctorName;
+  final String text;
+  final DateTime timestamp;
+  bool isRead;
+
+  PatientMessage({
+    required this.doctorId,
+    required this.doctorName,
+    required this.text,
+    required this.timestamp,
+    this.isRead = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'doctorId': doctorId,
+        'doctorName': doctorName,
+        'text': text,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+        'isRead': isRead,
+      };
+
+  factory PatientMessage.fromJson(Map<String, dynamic> j) => PatientMessage(
+        doctorId: j['doctorId'] as String,
+        doctorName: j['doctorName'] as String,
+        text: j['text'] as String,
+        timestamp:
+            DateTime.fromMillisecondsSinceEpoch(j['timestamp'] as int),
+        isRead: j['isRead'] as bool? ?? false,
+      );
+}
+
 class AuthService {
   static const _usersKey = 'qm_users';
   static const _passwordsKey = 'qm_passwords';
@@ -385,6 +418,47 @@ class AuthService {
     } catch (_) {
       return null;
     }
+  }
+
+  // ── Doctor → Patient messaging ─────────────────────────────────────────
+
+  static String _patientMsgsKey(String patientId) =>
+      'qm_pmsg_${patientId.trim().toLowerCase()}';
+
+  Future<List<PatientMessage>> getPatientMessages(String patientId) async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_patientMsgsKey(patientId));
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List<dynamic>)
+        .map((e) => PatientMessage.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> sendPatientMessage(
+      String patientId, String doctorId, String doctorName, String text) async {
+    final list = await getPatientMessages(patientId);
+    list.add(PatientMessage(
+      doctorId: doctorId,
+      doctorName: doctorName,
+      text: text,
+      timestamp: DateTime.now(),
+    ));
+    final prefs = await _prefs;
+    await prefs.setString(
+        _patientMsgsKey(patientId),
+        jsonEncode(list.map((m) => m.toJson()).toList()));
+  }
+
+  Future<void> markPatientMessagesRead(String patientId) async {
+    final list = await getPatientMessages(patientId);
+    if (list.isEmpty) return;
+    for (final m in list) {
+      m.isRead = true;
+    }
+    final prefs = await _prefs;
+    await prefs.setString(
+        _patientMsgsKey(patientId),
+        jsonEncode(list.map((m) => m.toJson()).toList()));
   }
 
   void signOut() => currentUser = null;

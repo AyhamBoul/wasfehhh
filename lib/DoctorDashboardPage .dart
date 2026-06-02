@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
 import 'auth_service.dart';
-import 'doctor_pharmacist_chat.dart';
 
 class DoctorDashboardPage extends StatefulWidget {
   const DoctorDashboardPage({super.key});
@@ -144,15 +143,6 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
     );
   }
 
-  void _openChat(String firstName) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) =>
-          DoctorPharmacistChat(firstName: firstName, userRole: 'doctor'),
-    );
-  }
 
   String get greeting {
     final hour = DateTime.now().hour;
@@ -219,7 +209,8 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
                         label: 'Pharmacist Chat',
                         subtitle: 'Message now',
                         color: const Color(0xFF0EA5E9),
-                        onTap: () => _openChat(firstName),
+                        onTap: () => Navigator.pushNamed(context, '/doctor-messages',
+                            arguments: userArgs),
                       ),
                     ],
                   ),
@@ -338,7 +329,8 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
         onCreate: () => Navigator.pushReplacementNamed(
             context, '/new-prescription',
             arguments: userArgs),
-        onMessages: () => _openChat(firstName),
+        onMessages: () => Navigator.pushNamed(
+            context, '/doctor-messages', arguments: userArgs),
         onSignOut: _signOut,
       ),
     );

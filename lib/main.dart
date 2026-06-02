@@ -4,6 +4,7 @@ import 'createaccount.dart';
 import 'profile_page.dart';
 import 'signin.dart';
 import 'splash_page.dart';
+import 'doctor_messages_page.dart';
 import 'PatientDashboardPage.dart';
 import 'DoctorDashboardPage .dart';
 import 'Pharmacist.dart';
@@ -47,6 +48,13 @@ class MyApp extends StatelessWidget {
         '/patient-records': (context) => const PatientRecordsPage(),
         '/guest-home': (context) => const GuestHomePage(),
         '/profile': (context) => const ProfilePage(),
+        '/doctor-messages': (context) => DoctorMessagesPage(
+              firstName: (ModalRoute.of(context)?.settings.arguments
+                          as Map<dynamic, dynamic>?)?['firstName']
+                      as String? ??
+                  AuthService().currentUser?.firstName ??
+                  'Doctor',
+            ),
       },
     );
   }

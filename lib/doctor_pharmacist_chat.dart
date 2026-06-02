@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_theme.dart';
-import 'auth_service.dart';
 
 class ChatMessage {
   final String sender; // 'doctor' or 'pharmacist'
@@ -48,8 +47,8 @@ class DoctorPharmacistChat extends StatefulWidget {
 }
 
 class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
-  String get _key =>
-      'qm_chat_${AuthService().currentUser?.nationalId ?? "guest"}';
+  // Shared key — all doctors and the pharmacist read/write the same thread.
+  static const String _key = 'qm_chat_doc_pharm';
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();

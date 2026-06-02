@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'app_theme.dart';
 import 'auth_service.dart';
-import 'doctor_pharmacist_chat.dart';
 
 const _units = ['mg', 'ml', 'mcg', 'g', 'IU', 'tablet(s)', 'capsule(s)', 'unit(s)'];
 
@@ -325,13 +324,8 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
         onHome: () => Navigator.pushReplacementNamed(
             context, '/doctor-dashboard', arguments: userArgs),
         onCreate: () {},
-        onMessages: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) =>
-              DoctorPharmacistChat(firstName: firstName, userRole: 'doctor'),
-        ),
+        onMessages: () => Navigator.pushNamed(
+            context, '/doctor-messages', arguments: userArgs),
         onLogout: () {
           AuthService().signOut();
           Navigator.pushReplacementNamed(context, '/signin');

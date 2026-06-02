@@ -16,6 +16,7 @@ class PatientDashboardPage extends StatefulWidget {
 
 class _PatientDashboardPageState extends State<PatientDashboardPage> {
   List<Prescription> _prescriptions = [];
+  List<PatientMessage> _messages = [];
   bool _loading = true;
 
   @override
@@ -27,10 +28,14 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   Future<void> _loadDashboard() async {
     final id = AuthService().currentUser?.nationalId;
     if (id == null) return;
-    final list = await AuthService().getPrescriptions(id);
+    final results = await Future.wait([
+      AuthService().getPrescriptions(id),
+      AuthService().getPatientMessages(id),
+    ]);
     if (mounted) {
       setState(() {
-        _prescriptions = list;
+        _prescriptions = results[0] as List<Prescription>;
+        _messages = results[1] as List<PatientMessage>;
         _loading = false;
       });
     }
@@ -42,82 +47,220 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   }
 
   void _showNotifications() {
-    final active = _prescriptions.where((p) => !p.isDispensed).toList();
+    final unread = _messages.where((m) => !m.isRead).toList();
+    final id = AuthService().currentUser?.nationalId ?? '';
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        decoration: const BoxDecoration(
-          color: kBg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: kBorder,
-                  borderRadius: BorderRadius.circular(2),
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.55,
+        maxChildSize: 0.9,
+        minChildSize: 0.3,
+        expand: false,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: kBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: kBorder,
+                      borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Notifications',
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: kTextPrimary)),
-            const SizedBox(height: 14),
-            if (active.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text('No active prescriptions.',
-                    style: TextStyle(color: kTextSecondary)),
-              )
-            else
-              ...active.expand((rx) => rx.medications.map((med) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: kPrimaryLight,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.medication_rounded,
-                              color: kPrimary, size: 20),
+              const SizedBox(height: 16),
+              const Text('Notifications',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary)),
+              const SizedBox(height: 18),
+
+              // ── Messages from doctors ──
+              if (_messages.isNotEmpty) ...[
+                Text(
+                  'Messages from your doctor',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: kTextSecondary,
+                      letterSpacing: 0.4),
+                ),
+                const SizedBox(height: 10),
+                ..._messages.reversed.map((msg) => Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: msg.isRead
+                            ? kCardBg
+                            : kPrimary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: msg.isRead
+                              ? kBorder
+                              : kPrimary.withValues(alpha: 0.25),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: kPrimaryLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                                Icons.medical_services_rounded,
+                                color: kPrimary,
+                                size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(msg.doctorName,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                              color: kTextPrimary)),
+                                    ),
+                                    if (!msg.isRead)
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          color: kPrimary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(msg.text,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        color: kTextPrimary,
+                                        height: 1.4)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _fmtMsgTime(msg.timestamp),
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: kTextSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                if (unread.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: TextButton(
+                      onPressed: () async {
+                        await AuthService().markPatientMessagesRead(id);
+                        if (!mounted) return;
+                        setState(() {
+                          for (final m in _messages) {
+                            m.isRead = true;
+                          }
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Mark all as read'),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+              ],
+
+              // ── Active prescriptions ──
+              Text(
+                'Active prescriptions',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: kTextSecondary,
+                    letterSpacing: 0.4),
+              ),
+              const SizedBox(height: 10),
+              if (_prescriptions.where((p) => !p.isDispensed).isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('No active prescriptions.',
+                      style: TextStyle(color: kTextSecondary, fontSize: 13)),
+                )
+              else
+                ..._prescriptions
+                    .where((p) => !p.isDispensed)
+                    .expand((rx) => rx.medications.map((med) => Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: kCardBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: kBorder),
+                          ),
+                          child: Row(
                             children: [
-                              Text('${med.name} ${med.dosage}',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                      color: kTextPrimary)),
-                              Text(med.frequency,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: kTextSecondary)),
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: kPrimaryLight,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.medication_rounded,
+                                    color: kPrimary, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text('${med.name} ${med.dosage}',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                            color: kTextPrimary)),
+                                    Text(med.frequency,
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color: kTextSecondary)),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ))),
-          ],
+                        ))),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  String _fmtMsgTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   // Returns the earliest time slot (hour, minute) for a frequency string.
@@ -358,7 +501,25 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     children: [
                       GestureDetector(
                         onTap: _showNotifications,
-                        child: _headerIcon(Icons.notifications_none_rounded),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            _headerIcon(Icons.notifications_none_rounded),
+                            if (_messages.any((m) => !m.isRead))
+                              Positioned(
+                                top: 2,
+                                right: 2,
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: const BoxDecoration(
+                                    color: kWarning,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 10),
                       GestureDetector(
