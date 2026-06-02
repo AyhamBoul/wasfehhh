@@ -17,19 +17,18 @@ class ChatMessage {
   });
 
   Map<String, dynamic> toJson() => {
-        'sender': sender,
-        'senderName': senderName,
-        'text': text,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-      };
+    'sender': sender,
+    'senderName': senderName,
+    'text': text,
+    'timestamp': timestamp.millisecondsSinceEpoch,
+  };
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
-        sender: j['sender'] as String,
-        senderName: j['senderName'] as String,
-        text: j['text'] as String,
-        timestamp:
-            DateTime.fromMillisecondsSinceEpoch(j['timestamp'] as int),
-      );
+    sender: j['sender'] as String,
+    senderName: j['senderName'] as String,
+    text: j['text'] as String,
+    timestamp: DateTime.fromMillisecondsSinceEpoch(j['timestamp'] as int),
+  );
 }
 
 class DoctorPharmacistChat extends StatefulWidget {
@@ -83,7 +82,9 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
   Future<void> _saveMessages(List<ChatMessage> msgs) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-        _key, jsonEncode(msgs.map((m) => m.toJson()).toList()));
+      _key,
+      jsonEncode(msgs.map((m) => m.toJson()).toList()),
+    );
   }
 
   void _sendMessage() {
@@ -130,8 +131,7 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
 
   @override
   Widget build(BuildContext context) {
-    final otherRole =
-        widget.userRole == 'doctor' ? 'Pharmacist' : 'Doctor';
+    final otherRole = widget.userRole == 'doctor' ? 'Pharmacist' : 'Doctor';
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
@@ -188,14 +188,14 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
                       Text(
                         'Chat with $otherRole',
                         style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary,
+                        ),
                       ),
                       const Text(
                         'Secure professional channel',
-                        style:
-                            TextStyle(fontSize: 11, color: kTextSecondary),
+                        style: TextStyle(fontSize: 11, color: kTextSecondary),
                       ),
                     ],
                   ),
@@ -212,16 +212,20 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: kPrimary))
+                    child: CircularProgressIndicator(color: kPrimary),
+                  )
                 : ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     itemCount: _messages.length,
                     itemBuilder: (_, i) {
                       final msg = _messages[i];
                       final isMe = msg.sender == widget.userRole;
-                      final showTime = i == 0 ||
+                      final showTime =
+                          i == 0 ||
                           msg.timestamp
                                   .difference(_messages[i - 1].timestamp)
                                   .inMinutes >
@@ -231,12 +235,13 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
                         children: [
                           if (showTime)
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Text(
                                 _formatTime(msg.timestamp),
                                 style: const TextStyle(
-                                    fontSize: 11, color: kTextSecondary),
+                                  fontSize: 11,
+                                  color: kTextSecondary,
+                                ),
                               ),
                             ),
                           Align(
@@ -250,24 +255,23 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
                                 right: isMe ? 0 : 56,
                               ),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: isMe ? kPrimary : kCardBg,
                                 borderRadius: BorderRadius.only(
                                   topLeft: const Radius.circular(16),
                                   topRight: const Radius.circular(16),
-                                  bottomLeft:
-                                      Radius.circular(isMe ? 16 : 4),
-                                  bottomRight:
-                                      Radius.circular(isMe ? 4 : 16),
+                                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                  bottomRight: Radius.circular(isMe ? 4 : 16),
                                 ),
                                 border: isMe
                                     ? null
                                     : Border.all(color: kBorder),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black
-                                        .withValues(alpha: 0.04),
+                                    color: Colors.black.withValues(alpha: 0.04),
                                     blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
@@ -284,8 +288,7 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       color: isMe
-                                          ? Colors.white
-                                              .withValues(alpha: 0.7)
+                                          ? Colors.white.withValues(alpha: 0.7)
                                           : kTextSecondary,
                                     ),
                                   ),
@@ -294,9 +297,7 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
                                     msg.text,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: isMe
-                                          ? Colors.white
-                                          : kTextPrimary,
+                                      color: isMe ? Colors.white : kTextPrimary,
                                     ),
                                   ),
                                 ],
@@ -312,10 +313,11 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
           // Input bar
           Container(
             padding: EdgeInsets.fromLTRB(
-                16,
-                10,
-                16,
-                10 + MediaQuery.of(context).viewInsets.bottom),
+              16,
+              10,
+              16,
+              10 + MediaQuery.of(context).viewInsets.bottom,
+            ),
             decoration: const BoxDecoration(
               color: kCardBg,
               border: Border(top: BorderSide(color: kBorder)),
@@ -331,7 +333,9 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
                       contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                 ),
@@ -345,8 +349,11 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
                       gradient: kGradient,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.send_rounded,
-                        color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ],

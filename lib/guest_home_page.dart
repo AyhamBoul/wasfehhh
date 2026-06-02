@@ -78,69 +78,19 @@ class _GuestHomePageState extends State<GuestHomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Browsing as guest',
-                                style: TextStyle(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.75),
-                                    fontSize: 13)),
-                            const Text('Nearby Pharmacies',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.5)),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            TextButton(
-                              onPressed: () =>
-                                  Navigator.pushReplacementNamed(
-                                      context, '/create-account'),
-                              style: TextButton.styleFrom(
-                                backgroundColor:
-                                    Colors.white.withValues(alpha: 0.15),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 7),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(20)),
-                              ),
-                              child: const Text('Sign Up',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12)),
-                            ),
-                            const SizedBox(width: 6),
-                            TextButton.icon(
-                              onPressed: () =>
-                                  Navigator.pushReplacementNamed(
-                                      context, '/signin'),
-                              style: TextButton.styleFrom(
-                                backgroundColor:
-                                    Colors.white.withValues(alpha: 0.25),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 7),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(20)),
-                              ),
-                              icon: const Icon(Icons.login, size: 14),
-                              label: const Text('Sign In',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12)),
-                            ),
-                          ],
-                        ),
+                        Text('Browsing as guest',
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: 13)),
+                        const Text('Nearby Pharmacies',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5)),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -289,15 +239,6 @@ class _GuestHomePageState extends State<GuestHomePage> {
                       color: const Color(0xFF7C3AED),
                       onTap: () =>
                           _openMaps('24 hour pharmacy near me'),
-                    ),
-                    const SizedBox(height: 10),
-                    _GuestPharmCard(
-                      icon: Icons.local_hospital_outlined,
-                      title: 'Hospital Pharmacy',
-                      subtitle: 'Hospital-affiliated',
-                      color: kDanger,
-                      onTap: () =>
-                          _openMaps('hospital pharmacy near me'),
                     ),
                     const SizedBox(height: 16),
 
