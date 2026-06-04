@@ -25,7 +25,15 @@ class _PrescriptionScannerPageState extends State<PrescriptionScannerPage> {
     final barcode = capture.barcodes.firstOrNull;
     if (barcode?.rawValue == null) return;
 
-    final raw = barcode!.rawValue!;
+    var raw = barcode!.rawValue!;
+
+    // Strip portal URL wrapper so normal phone scans still lead to the portal
+    // while the pharmacist app extracts the prescription data.
+    const urlPrefix = 'https://wasfeh.app/rx?d=';
+    if (raw.startsWith(urlPrefix)) {
+      raw = raw.substring(urlPrefix.length);
+    }
+
     if (!raw.startsWith('QM|')) {
       setState(() => _scanned = true);
       _controller.stop();

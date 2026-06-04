@@ -34,16 +34,6 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     super.dispose();
   }
 
-  String _routeForRole(String role) {
-    switch (role) {
-      case 'Doctor':
-        return '/doctor-dashboard';
-      case 'Pharmacist':
-        return '/pharmacist-portal';
-      default:
-        return '/patient-dashboard';
-    }
-  }
 
   Future<void> _createAccount() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -76,10 +66,38 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       );
       return;
     }
-    Navigator.pushReplacementNamed(
-      context,
-      _routeForRole(selectedRole),
-      arguments: {'firstName': AuthService().currentUser?.firstName ?? ''},
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.hourglass_top_rounded, color: kWarning),
+            SizedBox(width: 10),
+            Text('Pending Approval'),
+          ],
+        ),
+        content: const Text(
+          'Your account request has been submitted.\n\n'
+          'A system admin will review and approve your account. '
+          'You will be able to sign in once approved.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushReplacementNamed(context, '/signin');
+            },
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Back to Sign In'),
+          ),
+        ],
+      ),
     );
   }
 

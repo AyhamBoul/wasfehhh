@@ -1,10 +1,9 @@
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'app_theme.dart';
 
 class ChatMessage {
-  final String sender; // 'doctor' or 'pharmacist'
+  final String sender;
   final String senderName;
   final String text;
   final DateTime timestamp;
@@ -46,60 +45,32 @@ class DoctorPharmacistChat extends StatefulWidget {
 }
 
 class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
-  // Shared key — all doctors and the pharmacist read/write the same thread.
-  static const String _key = 'qm_chat_doc_pharm';
-
+  final _db = FirebaseFirestore.instance;
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();
-  List<ChatMessage> _messages = [];
-  bool _loading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadMessages();
-  }
+  CollectionReference<Map<String, dynamic>> get _messagesCol =>
+      _db.collection('chat_doc_pharm').doc('thread').collection('messages');
 
-  Future<void> _loadMessages() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    List<ChatMessage> loaded = [];
-    if (raw != null) {
-      final list = jsonDecode(raw) as List<dynamic>;
-      loaded = list
-          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    if (mounted) {
-      setState(() {
-        _messages = loaded;
-        _loading = false;
-      });
-      _scrollToBottom();
-    }
-  }
-
-  Future<void> _saveMessages(List<ChatMessage> msgs) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key,
-      jsonEncode(msgs.map((m) => m.toJson()).toList()),
-    );
-  }
+  Stream<List<ChatMessage>> get _chatStream => _messagesCol
+      .orderBy('timestamp')
+      .snapshots()
+      .map(
+        (snap) => snap.docs.map((d) => ChatMessage.fromJson(d.data())).toList(),
+      );
 
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    final msg = ChatMessage(
-      sender: widget.userRole,
-      senderName: widget.firstName,
-      text: text,
-      timestamp: DateTime.now(),
-    );
-    setState(() => _messages.add(msg));
     _controller.clear();
-    _saveMessages(_messages);
-    _scrollToBottom();
+    _messagesCol.add(
+      ChatMessage(
+        sender: widget.userRole,
+        senderName: widget.firstName,
+        text: text,
+        timestamp: DateTime.now(),
+      ).toJson(),
+    );
   }
 
   void _scrollToBottom() {
@@ -144,7 +115,6 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
       ),
       child: Column(
         children: [
-          // Handle bar
           const SizedBox(height: 10),
           Container(
             width: 36,
@@ -208,106 +178,114 @@ class _DoctorPharmacistChatState extends State<DoctorPharmacistChat> {
             ),
           ),
 
-          // Messages
+          // Messages (real-time stream)
           Expanded(
-            child: _loading
-                ? const Center(
+            child: StreamBuilder<List<ChatMessage>>(
+              stream: _chatStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
                     child: CircularProgressIndicator(color: kPrimary),
-                  )
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    itemCount: _messages.length,
-                    itemBuilder: (_, i) {
-                      final msg = _messages[i];
-                      final isMe = msg.sender == widget.userRole;
-                      final showTime =
-                          i == 0 ||
-                          msg.timestamp
-                                  .difference(_messages[i - 1].timestamp)
-                                  .inMinutes >
-                              30;
+                  );
+                }
+                final messages = snapshot.data ?? [];
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _scrollToBottom(),
+                );
+                return ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  itemCount: messages.length,
+                  itemBuilder: (_, i) {
+                    final msg = messages[i];
+                    final isMe = msg.sender == widget.userRole;
+                    final showTime =
+                        i == 0 ||
+                        msg.timestamp
+                                .difference(messages[i - 1].timestamp)
+                                .inMinutes >
+                            30;
 
-                      return Column(
-                        children: [
-                          if (showTime)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Text(
-                                _formatTime(msg.timestamp),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: kTextSecondary,
-                                ),
-                              ),
-                            ),
-                          Align(
-                            alignment: isMe
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
-                            child: Container(
-                              margin: EdgeInsets.only(
-                                bottom: 6,
-                                left: isMe ? 56 : 0,
-                                right: isMe ? 0 : 56,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isMe ? kPrimary : kCardBg,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(16),
-                                  topRight: const Radius.circular(16),
-                                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                  bottomRight: Radius.circular(isMe ? 4 : 16),
-                                ),
-                                border: isMe
-                                    ? null
-                                    : Border.all(color: kBorder),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: isMe
-                                    ? CrossAxisAlignment.end
-                                    : CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    msg.senderName,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: isMe
-                                          ? Colors.white.withValues(alpha: 0.7)
-                                          : kTextSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    msg.text,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: isMe ? Colors.white : kTextPrimary,
-                                    ),
-                                  ),
-                                ],
+                    return Column(
+                      children: [
+                        if (showTime)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              _formatTime(msg.timestamp),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: kTextSecondary,
                               ),
                             ),
                           ),
-                        ],
-                      );
-                    },
-                  ),
+                        Align(
+                          alignment: isMe
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            margin: EdgeInsets.only(
+                              bottom: 6,
+                              left: isMe ? 56 : 0,
+                              right: isMe ? 0 : 56,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMe ? kPrimary : kCardBg,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(16),
+                                topRight: const Radius.circular(16),
+                                bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                bottomRight: Radius.circular(isMe ? 4 : 16),
+                              ),
+                              border: isMe ? null : Border.all(color: kBorder),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: isMe
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  msg.senderName,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isMe
+                                        ? Colors.white.withValues(alpha: 0.7)
+                                        : kTextSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  msg.text,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isMe ? Colors.white : kTextPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ),
 
           // Input bar

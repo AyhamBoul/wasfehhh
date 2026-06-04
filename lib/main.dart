@@ -1,5 +1,8 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
+import 'firebase_options.dart';
 import 'createaccount.dart';
 import 'profile_page.dart';
 import 'signin.dart';
@@ -16,10 +19,12 @@ import 'prescription_scanner_page.dart';
 import 'auth_service.dart';
 import 'patient_records_page.dart';
 import 'guest_home_page.dart';
+import 'admin_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService().init();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (!kIsWeb) await NotificationService().init();
   await AuthService().seedDemoAccounts();
   runApp(const MyApp());
 }
@@ -47,6 +52,7 @@ class MyApp extends StatelessWidget {
         '/prescription-scanner': (context) => const PrescriptionScannerPage(),
         '/patient-records': (context) => const PatientRecordsPage(),
         '/guest-home': (context) => const GuestHomePage(),
+        '/admin-dashboard': (context) => const AdminDashboardPage(),
         '/profile': (context) => const ProfilePage(),
         '/doctor-messages': (context) => DoctorMessagesPage(
               firstName: (ModalRoute.of(context)?.settings.arguments

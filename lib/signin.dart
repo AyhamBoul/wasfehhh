@@ -33,6 +33,8 @@ class _SignInPageState extends State<SignInPage> {
         return '/doctor-dashboard';
       case 'Pharmacist':
         return '/pharmacist-portal';
+      case 'SuperAdmin':
+        return '/admin-dashboard';
       default:
         return '/patient-dashboard';
     }

@@ -170,60 +170,149 @@ class _PharmacistPortalPageState extends State<PharmacistPortalPage> {
     }
     if (!mounted) return;
     final active = prescriptions.where((p) => !p.isDispensed).toList();
+    _showPatientPrescriptionsDialog(user, active);
+  }
+
+  void _showPatientPrescriptionsDialog(AuthUser user, List<Prescription> active) {
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: kPrimary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: kPrimary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.person_outline,
+                          color: kPrimary, size: 20),
                     ),
-                    child: const Icon(Icons.person_outline,
-                        color: kPrimary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('Patient Found',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: kTextPrimary)),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _LookupRow(label: 'Name', value: user.fullName),
-              _LookupRow(label: 'National ID', value: user.nationalId),
-              _LookupRow(label: 'Email', value: user.email),
-              _LookupRow(
-                label: 'Rx',
-                value: active.isEmpty
-                    ? 'No active prescriptions'
-                    : '${active.length} active — added to queue',
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text('Close'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(user.fullName,
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: kTextPrimary)),
+                          Text(user.nationalId,
+                              style: const TextStyle(
+                                  fontSize: 12, color: kTextSecondary)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                if (active.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('No active prescriptions.',
+                        style: TextStyle(color: kTextSecondary)),
+                  )
+                else ...[
+                  Text('${active.length} active prescription(s)',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSecondary)),
+                  const SizedBox(height: 10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: active.length,
+                      itemBuilder: (_, i) {
+                        final rx = active[i];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: kCardBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: kBorder),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                rx.medications.map((m) => m.name).join(', '),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    color: kTextPrimary),
+                              ),
+                              const SizedBox(height: 2),
+                              Text('Dr. ${rx.doctorName}',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: kTextSecondary)),
+                              if (rx.notes.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(rx.notes,
+                                    style: const TextStyle(
+                                        fontSize: 12, color: kTextSecondary)),
+                              ],
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    Navigator.pop(ctx);
+                                    final saved = await AuthService()
+                                        .markDispensed(rx.id, rx.patientId);
+                                    if (!mounted) return;
+                                    if (saved) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(SnackBar(
+                                        content: Text(
+                                            'Dispensed for ${user.fullName}'),
+                                        backgroundColor: kSuccess,
+                                      ));
+                                      await _loadPending();
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kSuccess,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10)),
+                                  ),
+                                  child: const Text('Mark as Dispensed',
+                                      style: TextStyle(
+                                          color: Colors.white, fontSize: 13)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -779,35 +868,4 @@ class _NavItem extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LookupRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _LookupRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 80,
-              child: Text(label,
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kTextSecondary)),
-            ),
-            Expanded(
-              child: Text(value,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: kTextPrimary)),
-            ),
-          ],
-        ),
-      );
 }

@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'dart:ui';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'app_theme.dart';
 import 'auth_service.dart';
@@ -281,20 +281,16 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     final now = DateTime.now();
     final dateKey =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final storageKey = 'qm_taken_${userId}_$dateKey';
     final slot = _firstSlot(med.frequency);
     final takenKey = '${rx.id}:${med.name}:${slot.$1}:${slot.$2}';
+    final docId = '${userId}_$dateKey';
 
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(storageKey);
-    Set<String> taken = {};
-    if (raw != null) {
-      try {
-        taken = (jsonDecode(raw) as List<dynamic>).whereType<String>().toSet();
-      } catch (_) {}
-    }
-    taken.add(takenKey);
-    await prefs.setString(storageKey, jsonEncode(taken.toList()));
+    final ref = FirebaseFirestore.instance
+        .collection('medication_taken')
+        .doc(docId);
+    await ref.set({
+      'takenKeys': FieldValue.arrayUnion([takenKey]),
+    }, SetOptions(merge: true));
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -305,6 +301,83 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     );
     Navigator.pushReplacementNamed(context, '/medication-schedule',
         arguments: userArgs);
+  }
+
+  String _buildQrData(Prescription rx) {
+    final medsEncoded = rx.medications
+        .map((m) => '${m.name}:${m.dosage}:${m.frequency}')
+        .join(';');
+    final ts =
+        '${rx.issuedAt.year}-${rx.issuedAt.month.toString().padLeft(2, '0')}-${rx.issuedAt.day.toString().padLeft(2, '0')} '
+        '${rx.issuedAt.hour.toString().padLeft(2, '0')}:${rx.issuedAt.minute.toString().padLeft(2, '0')}';
+    final qmData = 'QM|${rx.patientId}|$medsEncoded|${rx.notes}|$ts|${rx.id}';
+    return 'https://wasfeh.app/rx?d=$qmData';
+  }
+
+  void _showPrescriptionQr(Prescription rx) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Your Prescription QR',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary)),
+              const SizedBox(height: 4),
+              const Text('Show this to your pharmacist',
+                  style: TextStyle(fontSize: 13, color: kTextSecondary)),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: QrImageView(
+                  data: _buildQrData(rx),
+                  version: QrVersions.auto,
+                  size: 220,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (rx.medications.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${rx.medications.map((m) => m.name).join(', ')} · Dr. ${rx.doctorName}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: kPrimary,
+                        fontWeight: FontWeight.w500),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String get greeting {
@@ -649,22 +722,43 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     ],
                   ),
           ),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: (rx.isDispensed ? kTextSecondary : kSuccess)
-                  .withValues(alpha: 0.11),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Text(
-              rx.isDispensed ? 'Dispensed' : 'Active',
-              style: TextStyle(
-                color: rx.isDispensed ? kTextSecondary : kSuccess,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: (rx.isDispensed ? kTextSecondary : kSuccess)
+                      .withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  rx.isDispensed ? 'Dispensed' : 'Active',
+                  style: TextStyle(
+                    color: rx.isDispensed ? kTextSecondary : kSuccess,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-            ),
+              if (!rx.isDispensed) ...[
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => _showPrescriptionQr(rx),
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.qr_code_rounded,
+                        color: kPrimary, size: 20),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),

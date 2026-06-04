@@ -1,5 +1,7 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthUser {
   final String nationalId;
@@ -7,6 +9,7 @@ class AuthUser {
   final String email;
   final String role;
   final String? licenseNumber;
+  final String uid;
 
   AuthUser({
     required this.nationalId,
@@ -14,6 +17,7 @@ class AuthUser {
     required this.email,
     required this.role,
     this.licenseNumber,
+    required this.uid,
   });
 
   String get firstName {
@@ -26,6 +30,7 @@ class AuthUser {
         'fullName': fullName,
         'email': email,
         'role': role,
+        'uid': uid,
         if (licenseNumber != null) 'licenseNumber': licenseNumber,
       };
 
@@ -34,6 +39,7 @@ class AuthUser {
         fullName: json['fullName'] as String,
         email: json['email'] as String,
         role: json['role'] as String,
+        uid: json['uid'] as String? ?? '',
         licenseNumber: json['licenseNumber'] as String?,
       );
 }
@@ -42,10 +48,7 @@ class PatientRecords {
   final List<String> allergies;
   final List<String> chronicConditions;
 
-  PatientRecords({
-    required this.allergies,
-    required this.chronicConditions,
-  });
+  PatientRecords({required this.allergies, required this.chronicConditions});
 
   Map<String, dynamic> toJson() => {
         'allergies': allergies,
@@ -166,45 +169,59 @@ class PatientMessage {
       );
 }
 
-class AuthService {
-  static const _usersKey = 'qm_users';
-  static const _passwordsKey = 'qm_passwords';
+class PendingUser {
+  final String nationalId;
+  final String fullName;
+  final String email;
+  final String role;
+  final String? licenseNumber;
+  final DateTime requestedAt;
+  String status;
 
+  PendingUser({
+    required this.nationalId,
+    required this.fullName,
+    required this.email,
+    required this.role,
+    this.licenseNumber,
+    required this.requestedAt,
+    this.status = 'pending',
+  });
+
+  Map<String, dynamic> toJson() => {
+        'nationalId': nationalId,
+        'fullName': fullName,
+        'email': email,
+        'role': role,
+        if (licenseNumber != null) 'licenseNumber': licenseNumber,
+        'requestedAt': requestedAt.millisecondsSinceEpoch,
+        'status': status,
+      };
+
+  factory PendingUser.fromJson(Map<String, dynamic> j) => PendingUser(
+        nationalId: j['nationalId'] as String,
+        fullName: j['fullName'] as String,
+        email: j['email'] as String,
+        role: j['role'] as String,
+        licenseNumber: j['licenseNumber'] as String?,
+        requestedAt:
+            DateTime.fromMillisecondsSinceEpoch(j['requestedAt'] as int),
+        status: j['status'] as String? ?? 'pending',
+      );
+}
+
+class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
 
-  // In-memory session — set on login/register, cleared on sign-out
+  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
+
   AuthUser? currentUser;
 
-  Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+  // ── Auth ──────────────────────────────────────────────────────────────────
 
-  Future<List<AuthUser>> _loadUsers() async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(_usersKey);
-    if (raw == null) return [];
-    final list = jsonDecode(raw) as List<dynamic>;
-    return list.map((e) => AuthUser.fromJson(e as Map<String, dynamic>)).toList();
-  }
-
-  Future<Map<String, String>> _loadPasswords() async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(_passwordsKey);
-    if (raw == null) return {};
-    return Map<String, String>.from(jsonDecode(raw) as Map);
-  }
-
-  Future<void> _saveUsers(List<AuthUser> users) async {
-    final prefs = await _prefs;
-    await prefs.setString(_usersKey, jsonEncode(users.map((u) => u.toJson()).toList()));
-  }
-
-  Future<void> _savePasswords(Map<String, String> passwords) async {
-    final prefs = await _prefs;
-    await prefs.setString(_passwordsKey, jsonEncode(passwords));
-  }
-
-  /// Returns null on success, or an error message string.
   Future<String?> register({
     required String nationalId,
     required String password,
@@ -212,75 +229,390 @@ class AuthService {
     required String email,
     required String role,
     String? licenseNumber,
+    bool skipPending = false,
   }) async {
-    final users = await _loadUsers();
-    final exists = users.any(
-      (u) => u.nationalId.toLowerCase() == nationalId.trim().toLowerCase(),
-    );
-    if (exists) return 'An account with this National ID already exists.';
+    final id = nationalId.trim();
 
-    final passwords = await _loadPasswords();
-    final newUser = AuthUser(
-      nationalId: nationalId.trim(),
-      fullName: fullName.trim(),
-      email: email.trim(),
-      role: role,
-      licenseNumber: licenseNumber?.trim(),
-    );
-    users.add(newUser);
-    passwords[nationalId.trim().toLowerCase()] = password;
+    // Check existing user by nationalId
+    final existing = await _db
+        .collection('users')
+        .where('nationalId', isEqualTo: id)
+        .limit(1)
+        .get();
+    if (existing.docs.isNotEmpty) {
+      return 'An account with this National ID already exists.';
+    }
 
-    await _saveUsers(users);
-    await _savePasswords(passwords);
-    currentUser = newUser;
+    if (skipPending) {
+      // Create Firebase Auth account then store user doc
+      try {
+        final cred = await _auth.createUserWithEmailAndPassword(
+            email: email.trim(), password: password);
+        final user = AuthUser(
+          nationalId: id,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          role: role,
+          licenseNumber: licenseNumber?.trim(),
+          uid: cred.user!.uid,
+        );
+        await _db.collection('users').doc(cred.user!.uid).set(user.toJson());
+        currentUser = user;
+        return null;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'email-already-in-use') {
+          // Account exists in Auth but not in users collection — just link
+          final snap = await _db
+              .collection('users')
+              .where('email', isEqualTo: email.trim())
+              .limit(1)
+              .get();
+          if (snap.docs.isEmpty) return null;
+        }
+        return null; // demo seed — ignore duplicates
+      }
+    }
+
+    // Normal registration goes to pending queue
+    final pendingSnap = await _db
+        .collection('pending_users')
+        .where('nationalId', isEqualTo: id)
+        .where('status', isEqualTo: 'pending')
+        .limit(1)
+        .get();
+    if (pendingSnap.docs.isNotEmpty) {
+      return 'A registration request for this National ID is already pending.';
+    }
+
+    await _db.collection('pending_users').add(PendingUser(
+          nationalId: id,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          role: role,
+          licenseNumber: licenseNumber?.trim(),
+          requestedAt: DateTime.now(),
+        ).toJson());
     return null;
   }
 
+  Future<AuthUser?> login({
+    required String nationalId,
+    required String password,
+  }) async {
+    try {
+      final snap = await _db
+          .collection('users')
+          .where('nationalId', isEqualTo: nationalId.trim())
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 10));
+      if (snap.docs.isEmpty) return null;
+
+      final data = snap.docs.first.data();
+      final email = data['email'] as String;
+
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      final user = AuthUser.fromJson(data);
+      currentUser = user;
+      return user;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void signOut() {
+    _auth.signOut();
+    currentUser = null;
+  }
+
+  // ── Pending approval queue ─────────────────────────────────────────────────
+
+  Future<List<PendingUser>> getPendingUsers() async {
+    final snap = await _db
+        .collection('pending_users')
+        .where('status', isEqualTo: 'pending')
+        .get();
+    return snap.docs
+        .map((d) => PendingUser.fromJson(d.data()))
+        .toList();
+  }
+
+  Future<void> approvePendingUser(String nationalId) async {
+    final snap = await _db
+        .collection('pending_users')
+        .where('nationalId', isEqualTo: nationalId)
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return;
+    final pending = PendingUser.fromJson(snap.docs.first.data());
+
+    // Create Firebase Auth account
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+          email: pending.email, password: 'Wasfeh@${pending.nationalId}');
+      final user = AuthUser(
+        nationalId: pending.nationalId,
+        fullName: pending.fullName,
+        email: pending.email,
+        role: pending.role,
+        licenseNumber: pending.licenseNumber,
+        uid: cred.user!.uid,
+      );
+      await _db.collection('users').doc(cred.user!.uid).set(user.toJson());
+    } on FirebaseAuthException {
+      // Already exists — just ensure user doc is present
+    }
+
+    await snap.docs.first.reference.delete();
+  }
+
+  Future<void> denyPendingUser(String nationalId) async {
+    final snap = await _db
+        .collection('pending_users')
+        .where('nationalId', isEqualTo: nationalId)
+        .limit(1)
+        .get();
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // ── User management (admin) ───────────────────────────────────────────────
+
+  Future<List<AuthUser>> getAllUsers() async {
+    final snap = await _db.collection('users').get();
+    return snap.docs.map((d) => AuthUser.fromJson(d.data())).toList();
+  }
+
+  Future<String?> updateUser({
+    required String nationalId,
+    String? fullName,
+    String? email,
+    String? role,
+    String? licenseNumber,
+    String? newPassword,
+  }) async {
+    final snap = await _db
+        .collection('users')
+        .where('nationalId', isEqualTo: nationalId)
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return 'User not found.';
+
+    final doc = snap.docs.first;
+    final data = doc.data();
+    final updates = <String, dynamic>{};
+    if (fullName != null) updates['fullName'] = fullName;
+    if (email != null) updates['email'] = email;
+    if (role != null) updates['role'] = role;
+    if (licenseNumber != null) updates['licenseNumber'] = licenseNumber;
+    if (updates.isNotEmpty) await doc.reference.update(updates);
+
+    if (currentUser?.nationalId.toLowerCase() == nationalId.toLowerCase()) {
+      currentUser = AuthUser.fromJson({...data, ...updates});
+    }
+    return null;
+  }
+
+  Future<void> deleteUser(String nationalId) async {
+    final snap = await _db
+        .collection('users')
+        .where('nationalId', isEqualTo: nationalId)
+        .limit(1)
+        .get();
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  Future<AuthUser?> findUser(String nationalId) async {
+    final snap = await _db
+        .collection('users')
+        .where('nationalId', isEqualTo: nationalId.trim())
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return null;
+    return AuthUser.fromJson(snap.docs.first.data());
+  }
+
+  // ── Records ───────────────────────────────────────────────────────────────
+
   Future<PatientRecords> getRecords(String nationalId) async {
-    final prefs = await _prefs;
-    final key = 'qm_records_${nationalId.trim().toLowerCase()}';
-    final raw = prefs.getString(key);
-    if (raw == null) return PatientRecords.empty();
-    return PatientRecords.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    final doc = await _db
+        .collection('records')
+        .doc(nationalId.trim().toLowerCase())
+        .get();
+    if (!doc.exists) return PatientRecords.empty();
+    return PatientRecords.fromJson(doc.data()!);
   }
 
   Future<void> saveRecords(String nationalId, PatientRecords records) async {
-    final prefs = await _prefs;
-    final key = 'qm_records_${nationalId.trim().toLowerCase()}';
-    await prefs.setString(key, jsonEncode(records.toJson()));
+    await _db
+        .collection('records')
+        .doc(nationalId.trim().toLowerCase())
+        .set(records.toJson());
   }
 
-  /// Seeds demo accounts on first launch. Safe to call every startup.
+  // ── Prescriptions ─────────────────────────────────────────────────────────
+
+  Future<List<Prescription>> getPrescriptions(String patientId) async {
+    final snap = await _db
+        .collection('prescriptions')
+        .where('patientId', isEqualTo: patientId.trim())
+        .orderBy('issuedAt', descending: true)
+        .get();
+    return snap.docs.map((d) => Prescription.fromJson(d.data())).toList();
+  }
+
+  Future<List<Prescription>> getDoctorPrescriptions(String doctorId) async {
+    final snap = await _db
+        .collection('prescriptions')
+        .where('doctorId', isEqualTo: doctorId.trim())
+        .orderBy('issuedAt', descending: true)
+        .get();
+    return snap.docs.map((d) => Prescription.fromJson(d.data())).toList();
+  }
+
+  Future<void> savePrescription(Prescription p) async {
+    await _db.collection('prescriptions').doc(p.id).set(p.toJson());
+  }
+
+  Future<bool> markDispensed(String prescriptionId, String patientId) async {
+    final doc = _db.collection('prescriptions').doc(prescriptionId);
+    final snap = await doc.get();
+    if (!snap.exists) return false;
+    final data = snap.data()!;
+    if (data['isDispensed'] == true) return false;
+
+    await doc.update({
+      'isDispensed': true,
+      'dispensedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+
+    if (currentUser?.role == 'Pharmacist') {
+      await removeFromPharmPending(currentUser!.nationalId, prescriptionId);
+    }
+    return true;
+  }
+
+  // ── Pharmacist pending queue ───────────────────────────────────────────────
+
+  Future<List<Prescription>> getPharmPending(String pharmacistId) async {
+    final snap = await _db
+        .collection('pharm_pending')
+        .doc(pharmacistId.trim().toLowerCase())
+        .collection('items')
+        .where('isDispensed', isEqualTo: false)
+        .get();
+    return snap.docs.map((d) => Prescription.fromJson(d.data())).toList();
+  }
+
+  Future<void> addToPharmPending(
+      String pharmacistId, List<Prescription> prescriptions) async {
+    final col = _db
+        .collection('pharm_pending')
+        .doc(pharmacistId.trim().toLowerCase())
+        .collection('items');
+    final batch = _db.batch();
+    for (final p in prescriptions.where((x) => !x.isDispensed)) {
+      batch.set(col.doc(p.id), p.toJson(), SetOptions(merge: true));
+    }
+    await batch.commit();
+  }
+
+  Future<void> removeFromPharmPending(
+      String pharmacistId, String prescriptionId) async {
+    await _db
+        .collection('pharm_pending')
+        .doc(pharmacistId.trim().toLowerCase())
+        .collection('items')
+        .doc(prescriptionId)
+        .delete();
+  }
+
+  // ── Doctor → Patient messaging ─────────────────────────────────────────────
+
+  Future<List<PatientMessage>> getPatientMessages(String patientId) async {
+    final snap = await _db
+        .collection('patient_messages')
+        .doc(patientId.trim().toLowerCase())
+        .collection('messages')
+        .orderBy('timestamp')
+        .get();
+    return snap.docs.map((d) => PatientMessage.fromJson(d.data())).toList();
+  }
+
+  Future<void> sendPatientMessage(String patientId, String doctorId,
+      String doctorName, String text) async {
+    final col = _db
+        .collection('patient_messages')
+        .doc(patientId.trim().toLowerCase())
+        .collection('messages');
+    final msg = PatientMessage(
+      doctorId: doctorId,
+      doctorName: doctorName,
+      text: text,
+      timestamp: DateTime.now(),
+    );
+    await col.add(msg.toJson());
+  }
+
+  Future<void> markPatientMessagesRead(String patientId) async {
+    final snap = await _db
+        .collection('patient_messages')
+        .doc(patientId.trim().toLowerCase())
+        .collection('messages')
+        .where('isRead', isEqualTo: false)
+        .get();
+    final batch = _db.batch();
+    for (final doc in snap.docs) {
+      batch.update(doc.reference, {'isRead': true});
+    }
+    await batch.commit();
+  }
+
+  // ── Demo seed ─────────────────────────────────────────────────────────────
+
+  // Ensures every demo account exists in BOTH Firebase Auth AND Firestore.
+  // Safe to call repeatedly — only creates what is missing.
   Future<void> seedDemoAccounts() async {
-    final demos = [
+    const demos = [
+      (
+        nationalId: 'ADMIN-001',
+        password: 'Admin123!',
+        fullName: 'System Admin',
+        email: 'admin@wasfeh.app',
+        role: 'SuperAdmin',
+        licenseNumber: null as String?,
+      ),
       (
         nationalId: 'DOC-001',
-        password: 'Doctor123',
+        password: 'Doctor123!',
         fullName: 'Dr. Sarah Wilson',
-        email: 'sarah.wilson@quickmedi.com',
+        email: 'sarah.wilson@wasfeh.app',
         role: 'Doctor',
         licenseNumber: 'LIC-DR-2024-001',
       ),
       (
         nationalId: 'PAT-001',
-        password: 'Patient123',
+        password: 'Patient123!',
         fullName: 'John Doe',
-        email: 'john.doe@quickmedi.com',
+        email: 'john.doe@wasfeh.app',
         role: 'Patient',
-        licenseNumber: null,
+        licenseNumber: null as String?,
       ),
       (
         nationalId: 'PHA-001',
-        password: 'Pharma123',
+        password: 'Pharma123!',
         fullName: 'Alice Smith',
-        email: 'alice.smith@quickmedi.com',
+        email: 'alice.smith@wasfeh.app',
         role: 'Pharmacist',
         licenseNumber: 'LIC-PH-2024-001',
       ),
     ];
 
     for (final d in demos) {
-      await register(
+      await _ensureDemoAccount(
         nationalId: d.nationalId,
         password: d.password,
         fullName: d.fullName,
@@ -289,177 +621,70 @@ class AuthService {
         licenseNumber: d.licenseNumber,
       );
     }
+
+    // Leave no signed-in user after seeding
+    await _auth.signOut();
     currentUser = null;
   }
 
-  /// Returns the authenticated user or null if credentials are wrong.
-  Future<AuthUser?> login({
+  Future<void> _ensureDemoAccount({
     required String nationalId,
     required String password,
+    required String fullName,
+    required String email,
+    required String role,
+    String? licenseNumber,
   }) async {
-    final passwords = await _loadPasswords();
-    final stored = passwords[nationalId.trim().toLowerCase()];
-    if (stored == null || stored != password) return null;
-
-    final users = await _loadUsers();
-    final user = users.firstWhere(
-      (u) => u.nationalId.toLowerCase() == nationalId.trim().toLowerCase(),
-      orElse: () => throw StateError('Password exists but user missing'),
-    );
-    currentUser = user;
-    return user;
-  }
-
-  // ── Prescriptions ──────────────────────────────────────────────────────
-
-  static String _rxKey(String patientId) =>
-      'qm_rx_${patientId.trim().toLowerCase()}';
-
-  static String _drxKey(String doctorId) =>
-      'qm_drx_${doctorId.trim().toLowerCase()}';
-
-  Future<List<Prescription>> getPrescriptions(String patientId) async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(_rxKey(patientId));
-    if (raw == null) return [];
-    return (jsonDecode(raw) as List<dynamic>)
-        .map((e) => Prescription.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<List<Prescription>> getDoctorPrescriptions(String doctorId) async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(_drxKey(doctorId));
-    if (raw == null) return [];
-    return (jsonDecode(raw) as List<dynamic>)
-        .map((e) => Prescription.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<void> savePrescription(Prescription p) async {
-    final pList = await getPrescriptions(p.patientId);
-    pList.add(p);
-    final prefs = await _prefs;
-    await prefs.setString(
-        _rxKey(p.patientId), jsonEncode(pList.map((x) => x.toJson()).toList()));
-    final dList = await getDoctorPrescriptions(p.doctorId);
-    dList.add(p);
-    await prefs.setString(
-        _drxKey(p.doctorId), jsonEncode(dList.map((x) => x.toJson()).toList()));
-  }
-
-  Future<bool> markDispensed(String prescriptionId, String patientId) async {
-    final list = await getPrescriptions(patientId);
-    final idx = list.indexWhere((p) => p.id == prescriptionId);
-    if (idx == -1) return false;
-    if (list[idx].isDispensed) return false;
-    list[idx].isDispensed = true;
-    list[idx].dispensedAt = DateTime.now();
-    final prefs = await _prefs;
-    await prefs.setString(
-        _rxKey(patientId), jsonEncode(list.map((p) => p.toJson()).toList()));
-    // Mirror the dispensed state into the doctor's copy.
-    final doctorId = list[idx].doctorId;
-    final dList = await getDoctorPrescriptions(doctorId);
-    final dIdx = dList.indexWhere((p) => p.id == prescriptionId);
-    if (dIdx != -1) {
-      dList[dIdx].isDispensed = true;
-      dList[dIdx].dispensedAt = list[idx].dispensedAt;
-      await prefs.setString(
-          _drxKey(doctorId), jsonEncode(dList.map((p) => p.toJson()).toList()));
-    }
-    if (currentUser?.role == 'Pharmacist') {
-      await removeFromPharmPending(currentUser!.nationalId, prescriptionId);
-    }
-    return true;
-  }
-
-  // ── Pharmacist pending queue ───────────────────────────────────────────
-
-  static String _pharmKey(String pharmacistId) =>
-      'qm_pharm_${pharmacistId.trim().toLowerCase()}';
-
-  Future<List<Prescription>> getPharmPending(String pharmacistId) async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(_pharmKey(pharmacistId));
-    if (raw == null) return [];
-    return (jsonDecode(raw) as List<dynamic>)
-        .map((e) => Prescription.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<void> addToPharmPending(
-      String pharmacistId, List<Prescription> prescriptions) async {
-    final existing = await getPharmPending(pharmacistId);
-    final existingIds = existing.map((p) => p.id).toSet();
-    for (final p in prescriptions.where((x) => !x.isDispensed)) {
-      if (!existingIds.contains(p.id)) existing.add(p);
-    }
-    final prefs = await _prefs;
-    await prefs.setString(_pharmKey(pharmacistId),
-        jsonEncode(existing.map((p) => p.toJson()).toList()));
-  }
-
-  Future<void> removeFromPharmPending(
-      String pharmacistId, String prescriptionId) async {
-    final list = await getPharmPending(pharmacistId);
-    list.removeWhere((p) => p.id == prescriptionId);
-    final prefs = await _prefs;
-    await prefs.setString(_pharmKey(pharmacistId),
-        jsonEncode(list.map((p) => p.toJson()).toList()));
-  }
-
-  Future<AuthUser?> findUser(String nationalId) async {
-    final users = await _loadUsers();
     try {
-      return users.firstWhere(
-        (u) => u.nationalId.toLowerCase() == nationalId.trim().toLowerCase(),
-      );
+      final signInResult = await _auth
+          .signInWithEmailAndPassword(email: email, password: password)
+          .timeout(const Duration(seconds: 10));
+
+      final uid = signInResult.user!.uid;
+      final doc = await _db.collection('users').doc(uid).get();
+      if (!doc.exists) {
+        await _db.collection('users').doc(uid).set(AuthUser(
+              nationalId: nationalId,
+              fullName: fullName,
+              email: email,
+              role: role,
+              licenseNumber: licenseNumber,
+              uid: uid,
+            ).toJson());
+      }
+      return;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'wrong-password') {
+        try {
+          final cred = await _auth.createUserWithEmailAndPassword(
+              email: email, password: password);
+          final uid = cred.user!.uid;
+
+          final stale = await _db
+              .collection('users')
+              .where('nationalId', isEqualTo: nationalId)
+              .limit(1)
+              .get();
+          for (final d in stale.docs) {
+            await d.reference.delete();
+          }
+
+          await _db.collection('users').doc(uid).set(AuthUser(
+                nationalId: nationalId,
+                fullName: fullName,
+                email: email,
+                role: role,
+                licenseNumber: licenseNumber,
+                uid: uid,
+              ).toJson());
+        } on FirebaseAuthException {
+          // Already exists — leave as-is
+        }
+      }
     } catch (_) {
-      return null;
+      // Timeout or network error — skip silently
     }
   }
-
-  // ── Doctor → Patient messaging ─────────────────────────────────────────
-
-  static String _patientMsgsKey(String patientId) =>
-      'qm_pmsg_${patientId.trim().toLowerCase()}';
-
-  Future<List<PatientMessage>> getPatientMessages(String patientId) async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(_patientMsgsKey(patientId));
-    if (raw == null) return [];
-    return (jsonDecode(raw) as List<dynamic>)
-        .map((e) => PatientMessage.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<void> sendPatientMessage(
-      String patientId, String doctorId, String doctorName, String text) async {
-    final list = await getPatientMessages(patientId);
-    list.add(PatientMessage(
-      doctorId: doctorId,
-      doctorName: doctorName,
-      text: text,
-      timestamp: DateTime.now(),
-    ));
-    final prefs = await _prefs;
-    await prefs.setString(
-        _patientMsgsKey(patientId),
-        jsonEncode(list.map((m) => m.toJson()).toList()));
-  }
-
-  Future<void> markPatientMessagesRead(String patientId) async {
-    final list = await getPatientMessages(patientId);
-    if (list.isEmpty) return;
-    for (final m in list) {
-      m.isRead = true;
-    }
-    final prefs = await _prefs;
-    await prefs.setString(
-        _patientMsgsKey(patientId),
-        jsonEncode(list.map((m) => m.toJson()).toList()));
-  }
-
-  void signOut() => currentUser = null;
 }

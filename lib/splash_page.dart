@@ -26,6 +26,8 @@ class _SplashPageState extends State<SplashPage> {
         return '/doctor-dashboard';
       case 'Pharmacist':
         return '/pharmacist-portal';
+      case 'SuperAdmin':
+        return '/admin-dashboard';
       default:
         return '/patient-dashboard';
     }

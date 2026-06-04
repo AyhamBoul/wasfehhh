@@ -1,6 +1,5 @@
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'app_theme.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
@@ -133,32 +132,28 @@ class _MedicationSchedulePageState extends State<MedicationSchedulePage> {
 
   Future<void> _loadTakenState() async {
     if (_medications.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
     final id = AuthService().currentUser?.nationalId ?? 'guest';
-    final raw = prefs.getString('qm_taken_${id}_${_todayKey()}');
-    if (raw == null) return;
-    try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      // New format: list of takenKey strings.
-      final takenKeys = decoded.whereType<String>().toSet();
-      for (final m in _medications) {
-        m.isTaken = takenKeys.contains(m.takenKey);
-      }
-    } catch (_) {
-      // Ignore stale data from old index-based format.
+    final doc = await FirebaseFirestore.instance
+        .collection('medication_taken')
+        .doc('${id}_${_todayKey()}')
+        .get();
+    if (!doc.exists) return;
+    final takenKeys =
+        List<String>.from((doc.data()?['takenKeys'] as List<dynamic>? ?? []));
+    for (final m in _medications) {
+      m.isTaken = takenKeys.contains(m.takenKey);
     }
     if (mounted) setState(() {});
   }
 
   Future<void> _saveTakenState() async {
-    final prefs = await SharedPreferences.getInstance();
     final id = AuthService().currentUser?.nationalId ?? 'guest';
     final takenKeys =
         _medications.where((m) => m.isTaken).map((m) => m.takenKey).toList();
-    await prefs.setString(
-      'qm_taken_${id}_${_todayKey()}',
-      jsonEncode(takenKeys),
-    );
+    await FirebaseFirestore.instance
+        .collection('medication_taken')
+        .doc('${id}_${_todayKey()}')
+        .set({'takenKeys': takenKeys});
   }
 
   Future<void> _scheduleNotifications() async {

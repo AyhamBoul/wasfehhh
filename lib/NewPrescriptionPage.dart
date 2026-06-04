@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'app_theme.dart';
 import 'auth_service.dart';
+import 'medication_service.dart';
 
 const _units = ['mg', 'ml', 'mcg', 'g', 'IU', 'tablet(s)', 'capsule(s)', 'unit(s)'];
 
@@ -36,6 +37,97 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
   final TextEditingController _patientIdController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   final List<_MedEntry> _medications = [_MedEntry()];
+  bool _checkingInteractions = false;
+
+  Future<bool> _warnInteractions() async {
+    final names = _medications.map((m) => m.name.text.trim()).toList();
+    if (names.length < 2) return true;
+    setState(() => _checkingInteractions = true);
+    final hits = await MedicationService.instance.checkAll(names);
+    setState(() => _checkingInteractions = false);
+    if (hits.isEmpty || !mounted) return true;
+
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            title: Row(children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: kWarning, size: 26),
+              const SizedBox(width: 10),
+              Text('${hits.length} Interaction${hits.length > 1 ? 's' : ''} Found',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            ]),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: hits.map((h) {
+                  final color = h.severity == 'major'
+                      ? kDanger
+                      : h.severity == 'moderate'
+                          ? kWarning
+                          : kSuccess;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: color.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(h.severity.toUpperCase(),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text('${h.drug1} + ${h.drug2}',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                        ]),
+                        const SizedBox(height: 6),
+                        Text(h.description,
+                            style: const TextStyle(
+                                fontSize: 12, color: kTextSecondary)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Review Meds',
+                    style: TextStyle(color: kTextSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: kDanger),
+                child: const Text('Issue Anyway'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 
   @override
   void dispose() {
@@ -80,7 +172,8 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
     final ts =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    return 'QM|$patientId|$medsEncoded|$notes|$ts|$prescriptionId';
+    final qmData = 'QM|$patientId|$medsEncoded|$notes|$ts|$prescriptionId';
+    return 'https://wasfeh.app/rx?d=$qmData';
   }
 
   Future<void> _issuePrescription(Map<String, String> userArgs) async {
@@ -90,12 +183,15 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
           .showSnackBar(SnackBar(content: Text(error), backgroundColor: kDanger));
       return;
     }
+    final proceed = await _warnInteractions();
+    if (!proceed) return;
     final prescriptionId = 'RX-${DateTime.now().millisecondsSinceEpoch}';
     final doctor = AuthService().currentUser;
     if (doctor != null) {
+      final patientId = _patientIdController.text.trim();
       await AuthService().savePrescription(Prescription(
         id: prescriptionId,
-        patientId: _patientIdController.text.trim(),
+        patientId: patientId,
         doctorId: doctor.nationalId,
         doctorName: doctor.fullName,
         medications: _medications
@@ -108,6 +204,13 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
         notes: _notesController.text.trim(),
         issuedAt: DateTime.now(),
       ));
+      final medNames = _medications.map((m) => m.name.text.trim()).join(', ');
+      await AuthService().sendPatientMessage(
+        patientId,
+        doctor.nationalId,
+        doctor.fullName,
+        'New prescription issued: $medNames. Open your prescriptions to view and show your QR code at the pharmacy.',
+      );
     }
     if (mounted) _showQrDialog(_buildQrData(prescriptionId), userArgs);
   }
@@ -310,9 +413,20 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _issuePrescription(userArgs),
-                  icon: const Icon(Icons.qr_code, size: 18),
-                  label: const Text('Issue Prescription'),
+                  onPressed: _checkingInteractions
+                      ? null
+                      : () => _issuePrescription(userArgs),
+                  icon: _checkingInteractions
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.qr_code, size: 18),
+                  label: Text(_checkingInteractions
+                      ? 'Checking interactions…'
+                      : 'Issue Prescription'),
                 ),
               ),
             ],
@@ -512,13 +626,56 @@ class _MedicationEntryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          TextField(
-            controller: entry.name,
-            onChanged: (_) => onChanged(),
-            decoration: const InputDecoration(
-              hintText: 'Medication name',
-              prefixIcon: Icon(Icons.medication_outlined,
-                  color: kTextSecondary, size: 18),
+          Autocomplete<String>(
+            optionsBuilder: (textEditingValue) async {
+              final q = textEditingValue.text.trim();
+              if (q.length < 2) return const [];
+              return MedicationService.instance.search(q);
+            },
+            onSelected: (selection) {
+              entry.name.text = selection;
+              onChanged();
+            },
+            fieldViewBuilder: (context, controller, focusNode, _) {
+              controller.addListener(() {
+                entry.name.text = controller.text;
+              });
+              return TextField(
+                controller: controller,
+                focusNode: focusNode,
+                onChanged: (_) => onChanged(),
+                decoration: const InputDecoration(
+                  hintText: 'Medication name',
+                  prefixIcon: Icon(Icons.medication_outlined,
+                      color: kTextSecondary, size: 18),
+                ),
+              );
+            },
+            optionsViewBuilder: (context, onSelected, options) => Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 220),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (_, i) {
+                      final drug = options.elementAt(i);
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.medication_outlined,
+                            size: 16, color: kPrimary),
+                        title: Text(drug,
+                            style: const TextStyle(fontSize: 13)),
+                        onTap: () => onSelected(drug),
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 8),
