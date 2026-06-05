@@ -31,7 +31,7 @@ class MedicationService {
   static final MedicationService instance = MedicationService._();
 
   // Update this once the API is deployed
-  static const _base = 'http://127.0.0.1:8000';
+  static const _base = 'http://192.168.1.107:8000';
 
   static const _timeout = Duration(seconds: 6);
 
