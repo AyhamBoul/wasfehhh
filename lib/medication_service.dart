@@ -31,7 +31,7 @@ class MedicationService {
   static final MedicationService instance = MedicationService._();
 
   // Update this once the API is deployed
-  static const _base = 'http://192.168.1.107:8000';
+  static const _base = 'https://wasfeh.up.railway.app';
 
   static const _timeout = Duration(seconds: 6);
 
