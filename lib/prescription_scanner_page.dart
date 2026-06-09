@@ -29,9 +29,15 @@ class _PrescriptionScannerPageState extends State<PrescriptionScannerPage> {
 
     // Strip portal URL wrapper so normal phone scans still lead to the portal
     // while the pharmacist app extracts the prescription data.
-    const urlPrefix = 'https://wasfeh.app/rx?d=';
-    if (raw.startsWith(urlPrefix)) {
-      raw = raw.substring(urlPrefix.length);
+    // Strip URL wrapper (supports both old and new hosting URLs)
+    for (final prefix in [
+      'https://wasfeh-f9b26.web.app/#/rx?d=',
+      'https://wasfeh.app/rx?d=',
+    ]) {
+      if (raw.startsWith(prefix)) {
+        raw = raw.substring(prefix.length);
+        break;
+      }
     }
 
     if (!raw.startsWith('QM|')) {

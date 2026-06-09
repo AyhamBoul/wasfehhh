@@ -36,6 +36,18 @@ class _SplashPageState extends State<SplashPage> {
   Future<void> _checkAuth() async {
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
+
+    // If opened via a QR prescription link, go straight to the view
+    final fragment = Uri.base.fragment; // e.g. "/rx?d=QM|..."
+    if (fragment.startsWith('/rx')) {
+      final qStr = fragment.contains('?') ? fragment.split('?').last : '';
+      final d = Uri.splitQueryString(qStr)['d'] ?? '';
+      if (d.isNotEmpty) {
+        Navigator.pushReplacementNamed(context, '/rx', arguments: {'d': d});
+        return;
+      }
+    }
+
     final user = AuthService().currentUser;
     if (user == null) {
       Navigator.pushReplacementNamed(context, '/signin');

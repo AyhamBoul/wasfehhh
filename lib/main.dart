@@ -20,6 +20,7 @@ import 'auth_service.dart';
 import 'patient_records_page.dart';
 import 'guest_home_page.dart';
 import 'admin_dashboard_page.dart';
+import 'prescription_view_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +54,12 @@ class MyApp extends StatelessWidget {
         '/patient-records': (context) => const PatientRecordsPage(),
         '/guest-home': (context) => const GuestHomePage(),
         '/admin-dashboard': (context) => const AdminDashboardPage(),
+        '/rx': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments
+              as Map<dynamic, dynamic>?;
+          return PrescriptionViewPage(
+              qrData: args?['d'] as String? ?? '');
+        },
         '/profile': (context) => const ProfilePage(),
         '/doctor-messages': (context) => DoctorMessagesPage(
               firstName: (ModalRoute.of(context)?.settings.arguments

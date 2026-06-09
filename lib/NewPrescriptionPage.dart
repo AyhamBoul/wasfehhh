@@ -173,7 +173,7 @@ class _NewPrescriptionPageState extends State<NewPrescriptionPage> {
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     final qmData = 'QM|$patientId|$medsEncoded|$notes|$ts|$prescriptionId';
-    return 'https://wasfeh.app/rx?d=$qmData';
+    return 'https://wasfeh-f9b26.web.app/#/rx?d=$qmData';
   }
 
   Future<void> _issuePrescription(Map<String, String> userArgs) async {
