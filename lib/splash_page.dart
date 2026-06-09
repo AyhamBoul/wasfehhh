@@ -37,13 +37,21 @@ class _SplashPageState extends State<SplashPage> {
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
 
-    // If opened via a QR prescription link, go straight to the view
+    // If opened via a QR prescription link
     final fragment = Uri.base.fragment; // e.g. "/rx?d=QM|..."
     if (fragment.startsWith('/rx')) {
       final qStr = fragment.contains('?') ? fragment.split('?').last : '';
       final d = Uri.splitQueryString(qStr)['d'] ?? '';
       if (d.isNotEmpty) {
-        Navigator.pushReplacementNamed(context, '/rx', arguments: {'d': d});
+        final user = AuthService().currentUser;
+        if (user != null) {
+          // Already signed in — go straight to prescription view
+          Navigator.pushReplacementNamed(context, '/rx', arguments: {'d': d});
+        } else {
+          // Not signed in — go to sign in, pass QR data to redirect after
+          Navigator.pushReplacementNamed(context, '/signin',
+              arguments: {'pendingRx': d});
+        }
         return;
       }
     }

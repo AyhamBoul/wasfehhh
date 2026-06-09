@@ -58,6 +58,16 @@ class _SignInPageState extends State<SignInPage> {
       );
       return;
     }
+    // If we arrived here from a QR link, go to the prescription after login
+    final args = ModalRoute.of(context)?.settings.arguments
+        as Map<dynamic, dynamic>?;
+    final pendingRx = args?['pendingRx'] as String?;
+    if (pendingRx != null && pendingRx.isNotEmpty) {
+      Navigator.pushReplacementNamed(context, '/rx',
+          arguments: {'d': pendingRx});
+      return;
+    }
+
     Navigator.pushReplacementNamed(
       context,
       _routeForRole(user.role),
