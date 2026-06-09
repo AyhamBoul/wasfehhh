@@ -311,7 +311,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         '${rx.issuedAt.year}-${rx.issuedAt.month.toString().padLeft(2, '0')}-${rx.issuedAt.day.toString().padLeft(2, '0')} '
         '${rx.issuedAt.hour.toString().padLeft(2, '0')}:${rx.issuedAt.minute.toString().padLeft(2, '0')}';
     final qmData = 'QM|${rx.patientId}|$medsEncoded|${rx.notes}|$ts|${rx.id}';
-    return 'https://wasfeh.app/rx?d=$qmData';
+    return 'https://wasfeh-f9b26.web.app/#/rx?d=$qmData';
   }
 
   void _showPrescriptionQr(Prescription rx) {
